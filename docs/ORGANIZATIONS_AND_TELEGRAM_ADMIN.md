@@ -55,6 +55,7 @@ Use underscores in the organization name if it contains spaces.
 - `/adduser ORGANIZATION_UUID username Full_Name` — creates another consultant. There is no consultant limit.
 - `/renew ORGANIZATION_UUID DAYS` — activates or extends the organization subscription.
 - `/suspend username` / `/activate username` — suspends or reactivates one member.
+- `/resetpass username` — generates a new password for a member.
 - `/suspendorg ORGANIZATION_UUID` / `/activateorg ORGANIZATION_UUID` — controls the whole organization.
 - `/orgs` — lists organizations and subscription status.
 - `/help` — shows command help.
