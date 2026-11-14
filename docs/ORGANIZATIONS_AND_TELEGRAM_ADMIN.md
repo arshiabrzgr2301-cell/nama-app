@@ -20,7 +20,7 @@ Deploy from the repository root using the Supabase CLI:
 
 ```bash
 supabase link --project-ref laezrjnznyjqfibpczfz
-supabase db push
+supabase db push --remote --yes
 supabase functions deploy username-login
 supabase functions deploy telegram-admin
 ```
@@ -31,10 +31,9 @@ Set these function secrets in the Supabase project (never put them in the app or
 supabase secrets set TELEGRAM_BOT_TOKEN="BOT_TOKEN_FROM_BOTFATHER"
 supabase secrets set TELEGRAM_ADMIN_IDS="YOUR_NUMERIC_TELEGRAM_USER_ID"
 supabase secrets set TELEGRAM_WEBHOOK_SECRET="A_LONG_RANDOM_SECRET"
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY="PROJECT_SERVICE_ROLE_KEY"
 ```
 
-Supabase provides `SUPABASE_URL` and `SUPABASE_ANON_KEY` to Edge Functions. The service-role key is only used inside server-side functions.
+Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and the legacy `SUPABASE_SERVICE_ROLE_KEY` environment variable to Edge Functions on this existing project. The service-role key is only used inside server-side functions and must never be added to GitHub or the mobile app.
 
 ## Telegram webhook
 
