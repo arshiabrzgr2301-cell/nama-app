@@ -1,0 +1,57 @@
+name: Deploy NAMA GPU video worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/video-to-3d-vr-pipeline
+    paths:
+      - "workers/modal_video_worker.py"
+      - ".github/workflows/deploy-modal-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate required deployment secrets
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NAMA_VIDEO_WORKER_SECRET: ${{ secrets.NAMA_VIDEO_WORKER_SECRET }}
+        run: |
+          python - <<'PY'
+          import os, sys
+          required = [
+              "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "SUPABASE_URL",
+              "SUPABASE_SERVICE_ROLE_KEY", "NAMA_VIDEO_WORKER_SECRET"
+          ]
+          missing = [key for key in required if not os.environ.get(key)]
+          if missing:
+              print("Missing GitHub Actions secrets: " + ", ".join(missing))
+              sys.exit(1)
+          PY
+
+      - name: Install Modal
+        run: pip install --upgrade modal
+
+      - name: Deploy GPU worker
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NAMA_VIDEO_WORKER_SECRET: ${{ secrets.NAMA_VIDEO_WORKER_SECRET }}
+        run: modal deploy workers/modal_video_worker.py
