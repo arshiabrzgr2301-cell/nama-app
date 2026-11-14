@@ -52,6 +52,8 @@ async function handle(chatId: number, text: string) {
       "/renew شناسه_سازمان تعداد_روز",
       "/suspend شناسه_کاربری",
       "/activate شناسه_کاربری",
+      "/suspendorg شناسه_سازمان",
+      "/activateorg شناسه_سازمان",
       "/orgs",
       "تعداد مشاوران هر سازمان نامحدود است.",
     ].join("\n"));
@@ -67,9 +69,6 @@ async function handle(chatId: number, text: string) {
     const org = orgs[0];
     try {
       const credentials = await createUser(org.id, adminUsername, adminName, "owner");
-      await db("organization_memberships?user_id=eq." + encodeURIComponent((await db("profiles?select=user_id&username=eq." + encodeURIComponent(adminUsername.toLowerCase())))[0].user_id), {
-        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ organization_id: org.id }),
-      }).catch(() => undefined);
       await db("organization_subscriptions", {
         method: "POST", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ organization_id: org.id, status: "pending" }),
@@ -83,11 +82,6 @@ async function handle(chatId: number, text: string) {
   if (command === "/adduser") {
     if (args.length < 3) return send(chatId, "فرمت: /adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور");
     const result = await createUser(args[0], args[1], args.slice(2).join(" "), "consultant");
-    const profiles = await db("profiles?select=user_id&username=eq." + encodeURIComponent(result.username));
-    await db("organization_memberships", {
-      method: "POST", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ organization_id: args[0], user_id: profiles[0].user_id, role: "consultant", status: "active" }),
-    });
     return send(chatId, `حساب مشاور ساخته شد.\nنام کاربری: ${result.username}\nرمز موقت: ${result.password}\nسازمان: ${args[0]}`);
   }
   if (command === "/renew") {
@@ -114,6 +108,18 @@ async function handle(chatId: number, text: string) {
     });
     return send(chatId, command === "/suspend" ? "دسترسی کاربر تعلیق شد." : "دسترسی کاربر فعال شد.");
   }
+  if (command === "/suspendorg" || command === "/activateorg") {
+    if (!args[0]) return send(chatId, "فرمت: /suspendorg شناسه_سازمان");
+    await db("organizations?id=eq." + encodeURIComponent(args[0]), {
+      method: "PATCH", body: JSON.stringify({ status: command === "/suspendorg" ? "suspended" : "active" }),
+    });
+    if (command === "/suspendorg") {
+      await db("organization_subscriptions?organization_id=eq." + encodeURIComponent(args[0]), {
+        method: "PATCH", body: JSON.stringify({ status: "suspended" }),
+      });
+    }
+    return send(chatId, command === "/suspendorg" ? "کل سازمان و دسترسی اعضا تعلیق شد." : "وضعیت سازمان فعال شد؛ برای بازگشت دسترسی، اشتراک را نیز فعال/تمدید کنید.");
+  }
   if (command === "/orgs") {
     const orgs = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&order=created_at.desc");
     const lines = orgs.map((o: any) => `${o.name} | ${o.status} | ${o.id} | ${o.organization_subscriptions?.[0]?.status || "بدون اشتراک"} | ${o.organization_subscriptions?.[0]?.expires_at || "-"}`);
@@ -125,7 +131,7 @@ async function handle(chatId: number, text: string) {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("ok");
   const expected = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") || "";
-  if (expected && req.headers.get("x-telegram-bot-api-secret-token") !== expected) return new Response("forbidden", { status: 403 });
+  if (!expected || req.headers.get("x-telegram-bot-api-secret-token") !== expected) return new Response("forbidden", { status: 403 });
   try {
     const update = await req.json();
     const message = update.message;
