@@ -42,7 +42,10 @@ async function parseError(res: Response): Promise<Error> {
   const body = await res.text();
   try {
     const data = JSON.parse(body);
-    return new Error(data.msg || data.message || data.error_description || data.error || body || `HTTP ${res.status}`);
+    const error: any = new Error(data.msg || data.message || data.error_description || data.error || body || `HTTP ${res.status}`);
+    error.code = data.code || data.error_code;
+    error.status = res.status;
+    return error;
   } catch {
     return new Error(body || `HTTP ${res.status}`);
   }
@@ -142,6 +145,14 @@ async function uploadLocalFile(uri: string, ownerId: string, propertyId: string,
 export const api = {
   login: (email: string, password: string) =>
     signIn('/auth/v1/token?grant_type=password', { email, password }),
+  resendSignupConfirmation: async (email: string): Promise<void> => {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'signup', email: email.trim() }),
+    });
+    if (!res.ok) throw await parseError(res);
+  },
   register: (data: { name: string; email: string; password: string; officeName: string; phone?: string }) =>
     signIn('/auth/v1/signup', {
       email: data.email, password: data.password,
