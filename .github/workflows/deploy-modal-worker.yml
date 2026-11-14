@@ -2,12 +2,6 @@ name: Deploy NAMA GPU video worker
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feat/video-to-3d-vr-pipeline
-    paths:
-      - "workers/modal_video_worker.py"
-      - ".github/workflows/deploy-modal-worker.yml"
 
 permissions:
   contents: read
