@@ -1,6 +1,9 @@
 -- NAMA multi-tenant organizations with unlimited consultants per organization.
 -- Apply with: supabase db push (or paste into the Supabase SQL editor).
 create extension if not exists pgcrypto;
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
 
 create table if not exists public.organizations (
   id uuid primary key default gen_random_uuid(),
@@ -46,7 +49,7 @@ create index if not exists organization_memberships_org_idx on public.organizati
 create index if not exists organization_memberships_user_idx on public.organization_memberships(user_id);
 create index if not exists organization_subscriptions_expiry_idx on public.organization_subscriptions(expires_at);
 
-create or replace function public.nama_is_active_member(target_org uuid)
+create or replace function private.nama_is_active_member(target_org uuid)
 returns boolean
 language sql
 stable
@@ -68,7 +71,7 @@ as $$
   );
 $$;
 
-create or replace function public.nama_current_org_id()
+create or replace function private.nama_current_org_id()
 returns uuid
 language sql
 stable
@@ -91,7 +94,7 @@ $$;
 alter table public.properties add column if not exists organization_id uuid references public.organizations(id) on delete cascade;
 create index if not exists properties_organization_idx on public.properties(organization_id);
 
-create or replace function public.nama_assign_property_org()
+create or replace function private.nama_assign_property_org()
 returns trigger
 language plpgsql
 security definer
@@ -122,20 +125,32 @@ $$;
 drop trigger if exists nama_property_org_guard on public.properties;
 create trigger nama_property_org_guard
 before insert or update of organization_id on public.properties
-for each row execute function public.nama_assign_property_org();
+for each row execute function private.nama_assign_property_org();
+
+revoke all on function private.nama_is_active_member(uuid) from public, anon;
+revoke all on function private.nama_current_org_id() from public, anon;
+revoke all on function private.nama_assign_property_org() from public, anon, authenticated;
+grant execute on function private.nama_is_active_member(uuid) to authenticated;
+grant execute on function private.nama_current_org_id() to authenticated;
 
 alter table public.organizations enable row level security;
 alter table public.organization_subscriptions enable row level security;
 alter table public.profiles enable row level security;
 alter table public.organization_memberships enable row level security;
 
+-- Remove the previous owner-only policies: otherwise their permissive OR behavior
+-- would let an expired organization continue using its old accounts.
+drop policy if exists "Owners manage their properties" on public.properties;
+drop policy if exists "Owners manage their hotspots" on public.hotspots;
+drop policy if exists "Owners manage property media" on storage.objects;
+
 drop policy if exists "nama_org_read_members" on public.organizations;
 create policy "nama_org_read_members" on public.organizations
-for select to authenticated using (public.nama_is_active_member(id));
+for select to authenticated using (private.nama_is_active_member(id));
 
 drop policy if exists "nama_subscription_read_members" on public.organization_subscriptions;
 create policy "nama_subscription_read_members" on public.organization_subscriptions
-for select to authenticated using (public.nama_is_active_member(organization_id));
+for select to authenticated using (private.nama_is_active_member(organization_id));
 
 drop policy if exists "nama_profile_read_self_or_org" on public.profiles;
 create policy "nama_profile_read_self_or_org" on public.profiles
@@ -155,29 +170,29 @@ for update to authenticated using (user_id = auth.uid()) with check (user_id = a
 
 drop policy if exists "nama_membership_read_org" on public.organization_memberships;
 create policy "nama_membership_read_org" on public.organization_memberships
-for select to authenticated using (public.nama_is_active_member(organization_id));
+for select to authenticated using (private.nama_is_active_member(organization_id));
 
 drop policy if exists "nama_properties_org_select" on public.properties;
 create policy "nama_properties_org_select" on public.properties
-for select to authenticated using (public.nama_is_active_member(organization_id));
+for select to authenticated using (private.nama_is_active_member(organization_id));
 
 drop policy if exists "nama_properties_org_insert" on public.properties;
 create policy "nama_properties_org_insert" on public.properties
 for insert to authenticated with check (
-  owner_id = auth.uid() and organization_id = public.nama_current_org_id()
+  owner_id = auth.uid() and organization_id = private.nama_current_org_id()
 );
 
 drop policy if exists "nama_properties_org_update" on public.properties;
 create policy "nama_properties_org_update" on public.properties
-for update to authenticated using (public.nama_is_active_member(organization_id))
-with check (public.nama_is_active_member(organization_id));
+for update to authenticated using (private.nama_is_active_member(organization_id))
+with check (private.nama_is_active_member(organization_id));
 
 drop policy if exists "nama_hotspots_org_read" on public.hotspots;
 create policy "nama_hotspots_org_read" on public.hotspots
 for select to authenticated using (
   exists (select 1 from public.properties p
     where p.id = hotspots.property_id
-      and public.nama_is_active_member(p.organization_id))
+      and private.nama_is_active_member(p.organization_id))
 );
 
 drop policy if exists "nama_hotspots_org_insert" on public.hotspots;
@@ -186,7 +201,7 @@ for insert to authenticated with check (
   owner_id = auth.uid() and exists (
     select 1 from public.properties p
     where p.id = hotspots.property_id
-      and public.nama_is_active_member(p.organization_id)
+      and private.nama_is_active_member(p.organization_id)
   )
 );
 
@@ -195,11 +210,11 @@ create policy "nama_hotspots_org_update" on public.hotspots
 for update to authenticated using (
   exists (select 1 from public.properties p
     where p.id = hotspots.property_id
-      and public.nama_is_active_member(p.organization_id))
+      and private.nama_is_active_member(p.organization_id))
 ) with check (
   exists (select 1 from public.properties p
     where p.id = hotspots.property_id
-      and public.nama_is_active_member(p.organization_id))
+      and private.nama_is_active_member(p.organization_id))
 );
 
 revoke all on public.organizations, public.organization_subscriptions,
@@ -220,7 +235,7 @@ for select to authenticated using (
   and exists (
     select 1 from public.properties p
     where p.id = ((storage.foldername(name))[2])::uuid
-      and public.nama_is_active_member(p.organization_id)
+      and private.nama_is_active_member(p.organization_id)
   )
 );
 
@@ -233,13 +248,7 @@ for insert to authenticated with check (
   and (storage.foldername(name))[2] ~* '^[0-9a-f-]{36}
   'One subscription per organization. Consultant count is intentionally unlimited; access is controlled by status and expiry.';
 
-  and exists (
-    select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
-      and p.owner_id = auth.uid()
-      and public.nama_is_active_member(p.organization_id)
-  )
-);
+  and (storage.foldername(name))[2] ~* '^[0-9a-f-]{36}
 
 drop policy if exists "nama_org_media_update" on storage.objects;
 create policy "nama_org_media_update" on storage.objects
@@ -249,7 +258,7 @@ for update to authenticated using (
     select 1 from public.properties p
     where p.id = ((storage.foldername(name))[2])::uuid
       and p.owner_id = auth.uid()
-      and public.nama_is_active_member(p.organization_id)
+      and private.nama_is_active_member(p.organization_id)
   )
 ) with check (
   bucket_id = 'property-media'
@@ -257,7 +266,7 @@ for update to authenticated using (
     select 1 from public.properties p
     where p.id = ((storage.foldername(name))[2])::uuid
       and p.owner_id = auth.uid()
-      and public.nama_is_active_member(p.organization_id)
+      and private.nama_is_active_member(p.organization_id)
   )
 );
 
@@ -269,7 +278,50 @@ for delete to authenticated using (
     select 1 from public.properties p
     where p.id = ((storage.foldername(name))[2])::uuid
       and p.owner_id = auth.uid()
-      and public.nama_is_active_member(p.organization_id)
+      and private.nama_is_active_member(p.organization_id)
+  )
+);
+
+comment on table public.organization_subscriptions is
+  'One subscription per organization. Consultant count is intentionally unlimited; access is controlled by status and expiry.';
+
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and private.nama_is_active_member(p.organization_id)
+  )
+);
+
+drop policy if exists "nama_org_media_update" on storage.objects;
+create policy "nama_org_media_update" on storage.objects
+for update to authenticated using (
+  bucket_id = 'property-media'
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and private.nama_is_active_member(p.organization_id)
+  )
+) with check (
+  bucket_id = 'property-media'
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and private.nama_is_active_member(p.organization_id)
+  )
+);
+
+drop policy if exists "nama_org_media_delete" on storage.objects;
+create policy "nama_org_media_delete" on storage.objects
+for delete to authenticated using (
+  bucket_id = 'property-media'
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and private.nama_is_active_member(p.organization_id)
   )
 );
 
