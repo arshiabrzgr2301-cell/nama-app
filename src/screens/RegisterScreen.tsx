@@ -49,7 +49,13 @@ export default function RegisterScreen({ navigation }: Props) {
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      Alert.alert('ثبت‌نام ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
+      if (e.code === 'EMAIL_CONFIRMATION_REQUIRED') {
+        Alert.alert('ثبت‌نام انجام شد', e.message, [
+          { text: 'رفتن به ورود', onPress: () => navigation.replace('Login') },
+        ]);
+      } else {
+        Alert.alert('ثبت‌نام ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
+      }
     } finally {
       setLoading(false);
     }
