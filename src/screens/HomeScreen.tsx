@@ -25,7 +25,7 @@ const FEATURES = [
 export default function HomeScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="light" backgroundColor={colors.background} />
+      <StatusBar style="light" />
 
       {/* پس‌زمینه تزئینی */}
       <View style={styles.bgGlowTop} />
