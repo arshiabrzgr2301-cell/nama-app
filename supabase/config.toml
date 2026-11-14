@@ -1,0 +1,8 @@
+[functions.username-login]
+verify_jwt = false
+
+[functions.telegram-admin]
+verify_jwt = false
+
+[functions.public-tour]
+verify_jwt = false
