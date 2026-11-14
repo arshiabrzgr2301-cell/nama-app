@@ -40,13 +40,7 @@ export default function LoginScreen({ navigation }: Props) {
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      if (email.includes('@') && password.length >= 4) {
-        await saveToken('demo-token-' + Date.now());
-        await saveUser({ id: '1', name: 'مشاور دمو', email, officeName: 'دفتر نمونه' });
-        navigation.replace('Dashboard');
-      } else {
-        Alert.alert('ورود ناموفق', e.message || 'اطلاعات ورود صحیح نیست.');
-      }
+      Alert.alert('ورود ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
     } finally {
       setLoading(false);
     }
@@ -118,9 +112,6 @@ export default function LoginScreen({ navigation }: Props) {
             <Text style={styles.link}>حساب ندارید؟ ثبت‌نام دفتر املاک</Text>
           </TouchableOpacity>
 
-          <Text style={styles.hint}>
-            حالت دمو: هر ایمیل معتبر و رمز حداقل ۴ کاراکتر
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -208,11 +199,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
-  },
-  hint: {
-    marginTop: spacing.lg,
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
   },
 });
