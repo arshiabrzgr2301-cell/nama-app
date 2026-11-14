@@ -45,7 +45,6 @@ with check (
     select 1 from public.properties p
     where p.id = video_processing_jobs.property_id
       and p.organization_id = video_processing_jobs.organization_id
-      and p.owner_id = auth.uid()
       and p.video_path = video_processing_jobs.input_video_path
   )
 );
