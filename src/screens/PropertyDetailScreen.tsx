@@ -28,23 +28,10 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
     api
       .getProperty(id)
       .then(setProperty)
-      .catch(() => {
-        setProperty({
-          id,
-          title: 'آپارتمان نمونه',
-          city: 'تهران',
-          address: 'سعادت‌آباد',
-          price: 18500000000,
-          area: 145,
-          rooms: 3,
-          floor: 5,
-          description: 'نورگیر عالی، بازسازی کامل، دسترسی عالی به مترو.',
-          status: 'published',
-          views: 42,
-          publicTourUrl: 'https://nama.ir/t/' + id,
-          createdAt: new Date().toISOString(),
-        });
-      });
+      .catch((error: any) => {
+        Alert.alert('خطا', error?.message || 'دریافت اطلاعات ملک ناموفق بود.');
+        navigation.goBack();
+      });;
   }, [id]);
 
   if (!property) {
@@ -61,7 +48,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
   };
 
   const shareTour = async () => {
-    const url = property.publicTourUrl || `https://nama.ir/t/${property.id}`;
+    const url = property.publicTourUrl;
     try {
       await Share.share({
         message: `تور مجازی ملک «${property.title}» را ببینید:\n${url}`,
@@ -79,11 +66,8 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         await api.publishProperty(id);
         setProperty({ ...property, status: 'published' });
       }
-    } catch {
-      setProperty({
-        ...property,
-        status: property.status === 'published' ? 'draft' : 'published',
-      });
+    } catch (error: any) {
+      Alert.alert('عملیات ناموفق', error?.message || 'وضعیت ملک تغییر نکرد.');
     }
   };
 
