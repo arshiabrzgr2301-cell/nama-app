@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const safeJson = (value: unknown) =>
   JSON.stringify(value)
@@ -24,7 +25,7 @@ Deno.serve(async (req: Request) => {
   };
 
   const propertyResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/properties?select=id,title,city,address,description,panorama_path,status,organization_id,organizations(status,organization_subscriptions(status,starts_at,expires_at))&id=eq.${id}&status=eq.published&limit=1`,
+    `${SUPABASE_URL}/rest/v1/properties?select=id,title,city,address,description,panorama_path,status,organization_id&id=eq.${id}&status=eq.published&limit=1`,
     { headers },
   );
 
@@ -41,9 +42,19 @@ Deno.serve(async (req: Request) => {
   }
 
   const property = properties[0];
-  const rawSubscription = property.organizations?.organization_subscriptions;
-  const subscription = Array.isArray(rawSubscription) ? rawSubscription[0] : rawSubscription;
-  const subscriptionActive = property.organizations?.status === "active"
+  const adminHeaders = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+  const [orgRes, subscriptionRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/organizations?select=status&id=eq.${property.organization_id}&limit=1`, { headers: adminHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/organization_subscriptions?select=status,starts_at,expires_at&organization_id=eq.${property.organization_id}&limit=1`, { headers: adminHeaders }),
+  ]);
+  if (!orgRes.ok || !subscriptionRes.ok) return new Response("خطا در بررسی اشتراک.", { status: 502 });
+  const orgRows = await orgRes.json();
+  const subscriptionRows = await subscriptionRes.json();
+  const subscription = subscriptionRows[0];
+  const subscriptionActive = orgRows[0]?.status === "active"
     && subscription?.status === "active"
     && subscription?.starts_at && new Date(subscription.starts_at).getTime() <= Date.now()
     && subscription?.expires_at && new Date(subscription.expires_at).getTime() > Date.now();
