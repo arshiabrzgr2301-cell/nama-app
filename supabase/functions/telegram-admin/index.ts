@@ -38,7 +38,7 @@ async function createUser(orgId: string, username: string, fullName: string, rol
     await fetch(`${url}/auth/v1/admin/users/${user.id}`, { method: "DELETE", headers: dbHeaders });
     throw e;
   }
-  return { username: clean, password };
+  return { userId: user.id, username: clean, password };
 }
 
 async function handle(chatId: number, text: string) {
@@ -52,6 +52,7 @@ async function handle(chatId: number, text: string) {
       "/renew شناسه_سازمان تعداد_روز",
       "/suspend شناسه_کاربری",
       "/activate شناسه_کاربری",
+      "/resetpass شناسه_کاربری",
       "/suspendorg شناسه_سازمان",
       "/activateorg شناسه_سازمان",
       "/orgs",
@@ -64,11 +65,14 @@ async function handle(chatId: number, text: string) {
     const adminName = args.slice(2).join(" ");
     const orgs = await db("organizations", {
       method: "POST", headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ name: args[0], status: "active" }),
+      body: JSON.stringify({ name: args[0].replace(/_/g, " "), status: "active" }),
     });
     const org = orgs[0];
     try {
       const credentials = await createUser(org.id, adminUsername, adminName, "owner");
+      await db("organizations?id=eq." + encodeURIComponent(org.id), {
+        method: "PATCH", body: JSON.stringify({ created_by: credentials.userId }),
+      });
       await db("organization_subscriptions", {
         method: "POST", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ organization_id: org.id, status: "pending" }),
@@ -107,6 +111,17 @@ async function handle(chatId: number, text: string) {
       method: "PATCH", body: JSON.stringify({ status: command === "/suspend" ? "suspended" : "active" }),
     });
     return send(chatId, command === "/suspend" ? "دسترسی کاربر تعلیق شد." : "دسترسی کاربر فعال شد.");
+  }
+  if (command === "/resetpass") {
+    const username = (args[0] || "").toLowerCase();
+    const profiles = await db("profiles?select=user_id&username=eq." + encodeURIComponent(username));
+    if (!profiles.length) return send(chatId, "کاربر پیدا نشد.");
+    const password = makePassword();
+    const update = await fetch(`${url}/auth/v1/admin/users/${profiles[0].user_id}`, {
+      method: "PUT", headers: dbHeaders, body: JSON.stringify({ password }),
+    });
+    if (!update.ok) throw new Error("تغییر رمز عبور انجام نشد.");
+    return send(chatId, `رمز جدید کاربر ${username}:\n${password}\nاین رمز را فقط خصوصی به خود کاربر بدهید.`);
   }
   if (command === "/suspendorg" || command === "/activateorg") {
     if (!args[0]) return send(chatId, "فرمت: /suspendorg شناسه_سازمان");
