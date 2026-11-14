@@ -48,9 +48,9 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
   };
 
   const shareTour = async () => {
-    const url = property.panoramaUrl;
+    const url = property.publicTourUrl;
     if (!url) {
-      Alert.alert('لینک در دسترس نیست', 'تصویر تور برای این ملک آپلود نشده است.');
+      Alert.alert('لینک در دسترس نیست', 'ابتدا ملک را منتشر کنید تا لینک عمومی تور ساخته شود.');
       return;
     }
     try {
@@ -131,7 +131,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}>
-          <Text style={styles.secondaryBtnText}>اشتراک لینک موقت تصویر تور</Text>
+          <Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور ۳۶۰</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={toggleStatus}>
