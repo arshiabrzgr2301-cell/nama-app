@@ -68,7 +68,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     headers['Content-Type'] = 'application/json';
   }
   if (options.headers) {
-    new Headers(options.headers).forEach((value, key) => { headers[key] = value; });
+    new Headers(options.headers).forEach((value: string, key: string) => { headers[key] = value; });
   }
   let res = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers });
   if (res.status === 401 && retry) {
