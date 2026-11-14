@@ -18,8 +18,8 @@ type Props = {
 
 const FEATURES = [
   { icon: '🏠', label: 'تور ۳۶۰' },
-  { icon: '👓', label: 'حالت VR' },
-  { icon: '🔗', label: 'لینک مشتری' },
+  { icon: '⛶', label: 'نمایش تمام‌صفحه ۳۶۰' },
+  { icon: '☁️', label: 'ذخیره‌سازی ابری' },
 ];
 
 export default function HomeScreen({ navigation }: Props) {
@@ -76,7 +76,6 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.footer}>نسخه آزمایشی · مناسب دمو به مشاوران</Text>
       </View>
     </SafeAreaView>
   );
@@ -203,11 +202,5 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
-  },
-  footer: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: spacing.sm,
   },
 });
