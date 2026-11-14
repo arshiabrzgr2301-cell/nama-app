@@ -134,6 +134,16 @@ async function uploadLocalFile(uri: string, ownerId: string, propertyId: string,
 }
 
 export const api = {
+  validateMembership: async (): Promise<boolean> => {
+    try {
+      const memberships = await request<any[]>('/rest/v1/organization_memberships?select=id&limit=1');
+      if (memberships.length > 0) return true;
+    } catch {
+      // Treat a failed membership check as an invalid local session.
+    }
+    await clearAuth();
+    return false;
+  },
   login: async (username: string, password: string): Promise<AuthResponse> => {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/username-login`, {
       method: 'POST',
