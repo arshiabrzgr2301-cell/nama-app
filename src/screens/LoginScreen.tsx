@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
 import { api } from '../services/api';
-import { saveToken, saveUser } from '../utils/storage';
+import { saveToken, saveRefreshToken, saveUser } from '../utils/storage';
 import LogoMark from '../components/LogoMark';
 
 type Props = {
@@ -37,6 +37,7 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       const res = await api.login(email.trim(), password);
       await saveToken(res.token);
+      await saveRefreshToken(res.refreshToken);
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
