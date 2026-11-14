@@ -10,7 +10,7 @@
 
 ## Database deployment
 
-Apply the migration in `supabase/migrations/20261114000000_nama_organizations.sql` to the NAMA Supabase project before deploying the functions. It creates organizations, subscriptions, profiles, memberships, organization-aware property access, and organization-scoped media policies.
+Apply the migration in `supabase/migrations/20261114131452_nama_organizations_unlimited_subscriptions.sql` to the NAMA Supabase project before deploying the functions. It creates organizations, subscriptions, profiles, memberships, organization-aware property access, and organization-scoped media policies.
 
 The migration assumes the existing NAMA `properties`, `hotspots`, and `property-media` bucket already exist.
 
