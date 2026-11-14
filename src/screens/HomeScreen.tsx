@@ -60,14 +60,6 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => navigation.navigate('Register')}
-            activeOpacity={0.88}
-          >
-            <Text style={styles.secondaryBtnText}>ثبت‌نام دفتر املاک</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
             style={styles.ghostBtn}
             onPress={() => navigation.navigate('ScanGuide')}
             activeOpacity={0.7}
