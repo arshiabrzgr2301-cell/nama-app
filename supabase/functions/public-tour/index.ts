@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
 <meta name="referrer" content="no-referrer">
 <title>${title} | تور ۳۶۰</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
-<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"><\\/script>
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#090d16;color:#fff;font-family:system-ui,sans-serif}
@@ -136,7 +136,7 @@ pannellum.viewer("panorama", {
   compass: true,
   hotSpots: hotspots
 });
-<\\/script>
+</script>
 </body>
 </html>`;
 
