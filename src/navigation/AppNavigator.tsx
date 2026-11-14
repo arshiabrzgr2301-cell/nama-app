@@ -6,6 +6,7 @@ import { I18nManager, ActivityIndicator, View } from 'react-native';
 import { RootStackParamList } from '../types';
 import { colors } from '../theme';
 import { getToken } from '../utils/storage';
+import { api } from '../services/api';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -34,7 +35,8 @@ export default function AppNavigator() {
   useEffect(() => {
     (async () => {
       const token = await getToken();
-      setInitialRoute(token ? 'Dashboard' : 'Home');
+      const hasAccess = token ? await api.validateMembership() : false;
+      setInitialRoute(hasAccess ? 'Dashboard' : 'Home');
     })();
   }, []);
 
