@@ -4,6 +4,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+
+// RN 0.88 / React 19 currently exposes incompatible WebView declaration overloads.
+// Keep Expo's supported native package version and isolate the typing mismatch here.
+const CompatibleWebView = WebView as React.ComponentType<any>;
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
@@ -164,7 +168,7 @@ export default function TourViewerScreen({ navigation, route }: Props) {
       {loading ? (
         <View style={styles.message}><Text style={styles.messageText}>در حال بارگذاری تور...</Text></View>
       ) : panoramaUrl ? (
-        <WebView
+        <CompatibleWebView
           ref={setWebRef}
           originWhitelist={['*']}
           source={{ html: PANNELLUM_HTML(panoramaUrl, property?.hotspots || []) }}
