@@ -63,7 +63,7 @@ comment on table public.video_processing_jobs is
 create or replace function public.nama_claim_video_processing_job()
 returns setof public.video_processing_jobs
 language plpgsql
-security definer
+security invoker
 set search_path = public, pg_temp
 as $$
 declare claimed public.video_processing_jobs;
