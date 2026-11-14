@@ -9,6 +9,7 @@ import {
 const SUPABASE_URL = 'https://laezrjnznyjqfibpczfz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ZFId00wDoEsw0TGluzBvBQ_xARK9g8o';
 const MEDIA_BUCKET = 'property-media';
+const PUBLIC_TOUR_ENDPOINT = `${SUPABASE_URL}/functions/v1/public-tour`;
 
 export interface PropertyPayload {
   title: string; city: string; address: string; price: number; area: number;
@@ -115,6 +116,7 @@ function mapProperty(row: any, media: { panoramaUrl?: string; videoUrl?: string 
     floor: Number(row.floor || 0), description: row.description || '',
     status: row.status, views: Number(row.views || 0), createdAt: row.created_at,
     ...media,
+    publicTourUrl: row.status === 'published' && row.panorama_path ? `${PUBLIC_TOUR_ENDPOINT}?id=${row.id}` : undefined,
   };
 }
 async function uploadLocalFile(uri: string, ownerId: string, propertyId: string, kind: 'panorama' | 'video'): Promise<string> {
@@ -193,7 +195,11 @@ export const api = {
     });
     return api.getProperty(id);
   },
-  publishProperty: async (id: string) => api.updateProperty(id, { status: 'published' }),
+  publishProperty: async (id: string) => {
+    const property = await api.getProperty(id);
+    if (!property.panoramaUrl) throw new Error('برای انتشار تور، ابتدا تصویر پانورامای ۳۶۰ را آپلود کنید.');
+    return api.updateProperty(id, { status: 'published' });
+  },
   setDraft: async (id: string) => api.updateProperty(id, { status: 'draft' }),
   addHotspot: async (propertyId: string, hotspot: Omit<Hotspot, 'id'>): Promise<Hotspot> => {
     const user = await request<{ id: string }>('/auth/v1/user');
