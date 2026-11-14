@@ -221,6 +221,8 @@ revoke all on public.organizations, public.organization_subscriptions,
   public.profiles, public.organization_memberships from anon;
 grant select on public.organizations, public.organization_subscriptions,
   public.profiles, public.organization_memberships to authenticated;
+grant all on public.organizations, public.organization_subscriptions,
+  public.profiles, public.organization_memberships to service_role;
 grant update (full_name, phone) on public.profiles to authenticated;
 
 -- Organization members may read media belonging to any property in their organization.
