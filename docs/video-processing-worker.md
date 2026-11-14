@@ -30,3 +30,12 @@ A separately deployed GPU worker (Modal, RunPod, or equivalent) must:
 
 ## Current deployment gate
 The database queue and app integration do not themselves perform GPU inference. A GPU worker URL and secret must be provisioned and stored as server-side secrets before jobs can move from `queued` to `processing`. Until then, NAMA must clearly show that processing is waiting for the worker; it must not display fake progress or claim a completed conversion.
+
+## Worker control endpoint
+Deploy `supabase/functions/video-processing-worker` and set the server-side Supabase secret `NAMA_VIDEO_WORKER_SECRET`. The GPU worker calls `POST /functions/v1/video-processing-worker` with `x-nama-worker-secret` and one of:
+- `{ "action": "claim" }` — atomically claims one queued job and returns a short-lived signed source-video URL.
+- `{ "action": "progress", "job_id": "...", "progress": 35 }` — reports progress.
+- `{ "action": "complete", "job_id": "...", "spatial_asset_path": "...", "stereo_video_path": "...", "metadata": {} }` — stores outputs and marks complete. Supply only outputs required by the selected mode.
+- `{ "action": "fail", "job_id": "...", "error_message": "..." }` — records a failure.
+
+The endpoint is intentionally not callable by the mobile app. Keep the worker secret and service-role key only in server-side secret stores.
