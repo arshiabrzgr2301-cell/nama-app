@@ -154,7 +154,7 @@ export default function TourViewerScreen({ navigation, route }: Props) {
           <TouchableOpacity disabled={!panoramaUrl} onPress={() => {
             if (panoramaUrl) navigation.navigate('VRMode', { id, panoramaUrl });
           }}>
-            <Text style={[styles.toolBtn, { color: colors.primary }]}>VR</Text>
+            <Text style={[styles.toolBtn, { color: colors.primary }]}>تمام‌صفحه</Text>
           </TouchableOpacity>
         </View>
       </View>
