@@ -30,6 +30,14 @@ Deno.serve(async (req) => {
     const profiles = await profileRes.json();
     if (!profiles.length) return reply({ error: "invalid_credentials", message: "نام کاربری یا رمز عبور نادرست است." }, 401);
 
+    const email = `${username}@users.nama.invalid`;
+    const authRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const session = await authRes.json();
+    if (!authRes.ok) return reply({ error: "invalid_credentials", message: "نام کاربری یا رمز عبور نادرست است." }, 401);
     const membershipRes = await fetch(
       `${url}/rest/v1/organization_memberships?select=organization_id,status,organizations(status,organization_subscriptions(status,starts_at,expires_at))&user_id=eq.${profiles[0].user_id}&limit=1`,
       { headers: { apikey: service, Authorization: `Bearer ${service}` } },
@@ -45,15 +53,6 @@ Deno.serve(async (req) => {
       && subscription?.starts_at && new Date(subscription.starts_at).getTime() <= Date.now()
       && subscription?.expires_at && new Date(subscription.expires_at).getTime() > Date.now();
     if (!active) return reply({ error: "organization_inactive", message: "اشتراک دفتر املاک شما فعال نیست. با مدیر دفتر تماس بگیرید." }, 403);
-
-    const email = `${username}@users.nama.invalid`;
-    const authRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: anon, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const session = await authRes.json();
-    if (!authRes.ok) return reply({ error: "invalid_credentials", message: "نام کاربری یا رمز عبور نادرست است." }, 401);
     return reply({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
