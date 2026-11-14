@@ -48,15 +48,7 @@ export default function RegisterScreen({ navigation }: Props) {
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      // حالت دمو بدون بک‌اند
-      await saveToken('demo-token-' + Date.now());
-      await saveUser({
-        id: '1',
-        name: name.trim(),
-        email: email.trim(),
-        officeName: officeName.trim(),
-      });
-      navigation.replace('Dashboard');
+      Alert.alert('ثبت‌نام ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
     } finally {
       setLoading(false);
     }
