@@ -6,8 +6,8 @@ import {
   clearAuth,
 } from '../utils/storage';
 
-const SUPABASE_URL = 'https://laezrjnznyjqfibpczfz.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_ZFId00wDoEsw0TGluzBvBQ_xARK9g8o';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://laezrjnznyjqfibpczfz.supabase.co';
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_ZFId00wDoEsw0TGluzBvBQ_xARK9g8o';
 const MEDIA_BUCKET = 'property-media';
 const PUBLIC_TOUR_ENDPOINT = `${SUPABASE_URL}/functions/v1/public-tour`;
 
@@ -96,7 +96,9 @@ function mapUser(session: SupabaseSession): AuthResponse {
 async function signIn(path: string, body: object): Promise<AuthResponse> {
   const session = await request<SupabaseSession>(path, { method: 'POST', body: JSON.stringify(body) });
   if (!session.access_token || !session.refresh_token) {
-    throw new Error('ثبت‌نام انجام شد؛ برای فعال‌سازی حساب، ایمیل خود را تأیید کنید و سپس وارد شوید.');
+    const error: any = new Error('ثبت‌نام انجام شد؛ برای فعال‌سازی حساب، ایمیل خود را تأیید کنید و سپس وارد شوید.');
+    error.code = 'EMAIL_CONFIRMATION_REQUIRED';
+    throw error;
   }
   return mapUser(session);
 }
