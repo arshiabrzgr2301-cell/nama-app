@@ -143,21 +143,17 @@ async function uploadLocalFile(uri: string, ownerId: string, propertyId: string,
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    signIn('/auth/v1/token?grant_type=password', { email, password }),
-  resendSignupConfirmation: async (email: string): Promise<void> => {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+  login: async (username: string, password: string): Promise<AuthResponse> => {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/username-login`, {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'signup', email: email.trim() }),
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
     });
     if (!res.ok) throw await parseError(res);
+    const session = await res.json() as SupabaseSession;
+    if (!session.access_token || !session.refresh_token) throw new Error('پاسخ ورود از سرور معتبر نیست.');
+    return mapUser(session);
   },
-  register: (data: { name: string; email: string; password: string; officeName: string; phone?: string }) =>
-    signIn('/auth/v1/signup', {
-      email: data.email, password: data.password,
-      data: { name: data.name, officeName: data.officeName, phone: data.phone || '' },
-    }),
   getProperties: async (): Promise<Property[]> => {
     const rows = await request<any[]>('/rest/v1/properties?select=*&order=created_at.desc');
     return Promise.all(rows.map(async row => mapProperty(row, {
