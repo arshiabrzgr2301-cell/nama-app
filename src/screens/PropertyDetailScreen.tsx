@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   Share,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -60,6 +61,15 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
       });
     } catch (error: any) {
       Alert.alert('اشتراک‌گذاری ناموفق', error?.message || '');
+    }
+  };
+
+  const openVideo = async () => {
+    if (!property.videoUrl) return;
+    try {
+      await Linking.openURL(property.videoUrl);
+    } catch (error: any) {
+      Alert.alert('پخش ویدیو ناموفق', error?.message || 'امکان باز کردن ویدیو وجود ندارد.');
     }
   };
 
@@ -129,6 +139,12 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         >
           <Text style={styles.primaryBtnText}>مشاهده تور ۳۶۰</Text>
         </TouchableOpacity>
+
+        {property.videoUrl ? (
+          <TouchableOpacity style={styles.secondaryBtn} onPress={openVideo}>
+            <Text style={styles.secondaryBtnText}>مشاهده ویدیوی اسکن خانه</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}>
           <Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور ۳۶۰</Text>
