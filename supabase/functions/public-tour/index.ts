@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   };
 
   const propertyResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/properties?select=id,title,city,address,description,panorama_path,status&id=eq.${id}&status=eq.published&limit=1`,
+    `${SUPABASE_URL}/rest/v1/properties?select=id,title,city,address,description,panorama_path,status,organization_id,organizations(status,organization_subscriptions(status,starts_at,expires_at))&id=eq.${id}&status=eq.published&limit=1`,
     { headers },
   );
 
@@ -41,6 +41,18 @@ Deno.serve(async (req: Request) => {
   }
 
   const property = properties[0];
+  const rawSubscription = property.organizations?.organization_subscriptions;
+  const subscription = Array.isArray(rawSubscription) ? rawSubscription[0] : rawSubscription;
+  const subscriptionActive = property.organizations?.status === "active"
+    && subscription?.status === "active"
+    && subscription?.starts_at && new Date(subscription.starts_at).getTime() <= Date.now()
+    && subscription?.expires_at && new Date(subscription.expires_at).getTime() > Date.now();
+  if (!subscriptionActive) {
+    return new Response("اشتراک این دفتر فعال نیست.", {
+      status: 403,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
   await fetch(`${SUPABASE_URL}/rest/v1/properties?id=eq.${id}`, {
     method: "PATCH",
     headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
