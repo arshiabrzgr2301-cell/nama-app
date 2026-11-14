@@ -234,7 +234,7 @@ for select to authenticated using (
 
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and private.nama_is_active_member(p.organization_id)
   )
 );
@@ -256,7 +256,7 @@ for update to authenticated using (
   bucket_id = 'property-media'
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
@@ -264,7 +264,7 @@ for update to authenticated using (
   bucket_id = 'property-media'
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
@@ -276,7 +276,7 @@ for delete to authenticated using (
   bucket_id = 'property-media'
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
@@ -287,7 +287,7 @@ comment on table public.organization_subscriptions is
 
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
@@ -299,7 +299,7 @@ for update to authenticated using (
   bucket_id = 'property-media'
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
@@ -307,7 +307,7 @@ for update to authenticated using (
   bucket_id = 'property-media'
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
@@ -319,7 +319,7 @@ for delete to authenticated using (
   bucket_id = 'property-media'
   and exists (
     select 1 from public.properties p
-    where p.id = ((storage.foldername(name))[2])::uuid
+    where p.id::text = (storage.foldername(name))[2]
       and p.owner_id = auth.uid()
       and private.nama_is_active_member(p.organization_id)
   )
