@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
@@ -25,7 +25,7 @@ const FEATURES = [
 export default function HomeScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar style="light" backgroundColor={colors.background} />
 
       {/* پس‌زمینه تزئینی */}
       <View style={styles.bgGlowTop} />
