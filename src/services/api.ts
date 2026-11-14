@@ -96,15 +96,6 @@ function mapUser(session: SupabaseSession): AuthResponse {
     },
   };
 }
-async function signIn(path: string, body: object): Promise<AuthResponse> {
-  const session = await request<SupabaseSession>(path, { method: 'POST', body: JSON.stringify(body) });
-  if (!session.access_token || !session.refresh_token) {
-    const error: any = new Error('ثبت‌نام انجام شد؛ برای فعال‌سازی حساب، ایمیل خود را تأیید کنید و سپس وارد شوید.');
-    error.code = 'EMAIL_CONFIRMATION_REQUIRED';
-    throw error;
-  }
-  return mapUser(session);
-}
 async function signedMediaUrl(path?: string | null): Promise<string | undefined> {
   if (!path) return undefined;
   const data = await request<{ signedURL?: string; signedUrl?: string }>(
