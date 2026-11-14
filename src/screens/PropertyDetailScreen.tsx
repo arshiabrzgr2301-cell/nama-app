@@ -48,9 +48,9 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
   };
 
   const shareTour = async () => {
-    const url = property.publicTourUrl;
+    const url = property.panoramaUrl;
     if (!url) {
-      Alert.alert('لینک در دسترس نیست', 'لینک عمومی تور هنوز ایجاد نشده است.');
+      Alert.alert('لینک در دسترس نیست', 'تصویر تور برای این ملک آپلود نشده است.');
       return;
     }
     try {
@@ -123,7 +123,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
           onPress={() =>
             navigation.navigate('TourViewer', {
               id: property.id,
-              panoramaUrl: property.publicTourUrl,
+              panoramaUrl: property.panoramaUrl,
             })
           }
         >
@@ -131,7 +131,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}>
-          <Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور</Text>
+          <Text style={styles.secondaryBtnText}>اشتراک لینک موقت تصویر تور</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={toggleStatus}>
