@@ -228,6 +228,8 @@ const styles = StyleSheet.create({
   toolTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   toolRight: { flexDirection: 'row-reverse', gap: 16 },
   webview: { flex: 1 },
+  message: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  messageText: { color: colors.text, fontSize: 15, textAlign: 'center' },
   footer: {
     padding: spacing.sm,
     backgroundColor: colors.surface,
