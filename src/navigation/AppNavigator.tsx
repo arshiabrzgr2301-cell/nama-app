@@ -9,7 +9,6 @@ import { getToken } from '../utils/storage';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddPropertyScreen from '../screens/AddPropertyScreen';
 import PropertyDetailScreen from '../screens/PropertyDetailScreen';
@@ -60,7 +59,6 @@ export default function AppNavigator() {
       >
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
         <Stack.Screen name="PropertyDetail" component={PropertyDetailScreen} />
