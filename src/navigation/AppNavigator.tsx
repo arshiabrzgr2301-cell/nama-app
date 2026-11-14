@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { enableScreens, enableFreeze } from 'react-native-screens';
 import { I18nManager, ActivityIndicator, View } from 'react-native';
 import { RootStackParamList } from '../types';
 import { colors } from '../theme';
@@ -15,6 +16,10 @@ import PropertyDetailScreen from '../screens/PropertyDetailScreen';
 import TourViewerScreen from '../screens/TourViewerScreen';
 import VRModeScreen from '../screens/VRModeScreen';
 import ScanGuideScreen from '../screens/ScanGuideScreen';
+
+// بهینه‌سازی حافظه و رندر صفحه‌های غیر فعال
+enableScreens(true);
+enableFreeze(true);
 
 // فعال‌سازی RTL برای فارسی
 if (!I18nManager.isRTL) {
@@ -49,7 +54,8 @@ export default function AppNavigator() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
-          animation: 'slide_from_left', // مناسب RTL
+          animation: 'slide_from_left',
+          freezeOnBlur: true,
         }}
       >
         <Stack.Screen name="Home" component={HomeScreen} />
