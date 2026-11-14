@@ -5,39 +5,56 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
+import LogoMark from '../components/LogoMark';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
+const FEATURES = [
+  { icon: '🏠', label: 'تور ۳۶۰' },
+  { icon: '👓', label: 'حالت VR' },
+  { icon: '🔗', label: 'لینک مشتری' },
+];
+
 export default function HomeScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>ناما</Text>
-          </View>
-          <Text style={styles.brand}>NAMA</Text>
-        </View>
 
-        <Text style={styles.slogan}>خانه را قبل از رفتن، ببین.</Text>
-        <Text style={styles.subtitle}>
-          پلتفرم بازدید مجازی املاک برای دفاتر املاک ایران
-        </Text>
+      {/* پس‌زمینه تزئینی */}
+      <View style={styles.bgGlowTop} />
+      <View style={styles.bgGlowBottom} />
+
+      <View style={styles.content}>
+        <View style={styles.hero}>
+          <LogoMark size={100} showWordmark />
+
+          <Text style={styles.slogan}>خانه را قبل از رفتن، ببین.</Text>
+          <Text style={styles.subtitle}>
+            پلتفرم بازدید مجازی املاک برای دفاتر املاک ایران
+          </Text>
+
+          <View style={styles.chips}>
+            {FEATURES.map((f) => (
+              <View key={f.label} style={styles.chip}>
+                <Text style={styles.chipIcon}>{f.icon}</Text>
+                <Text style={styles.chipText}>{f.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.primaryBtn}
             onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
             <Text style={styles.primaryBtnText}>ورود مشاور</Text>
           </TouchableOpacity>
@@ -45,7 +62,7 @@ export default function HomeScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.secondaryBtn}
             onPress={() => navigation.navigate('Register')}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
             <Text style={styles.secondaryBtnText}>ثبت‌نام دفتر املاک</Text>
           </TouchableOpacity>
@@ -55,9 +72,11 @@ export default function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('ScanGuide')}
             activeOpacity={0.7}
           >
-            <Text style={styles.ghostBtnText}>راهنمای اسکن خانه</Text>
+            <Text style={styles.ghostBtnText}>راهنمای اسکن خانه ←</Text>
           </TouchableOpacity>
         </View>
+
+        <Text style={styles.footer}>نسخه آزمایشی · مناسب دمو به مشاوران</Text>
       </View>
     </SafeAreaView>
   );
@@ -68,69 +87,104 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  bgGlowTop: {
+    position: 'absolute',
+    top: -80,
+    alignSelf: 'center',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.primaryGlow,
+    opacity: 0.25,
+  },
+  bgGlowBottom: {
+    position: 'absolute',
+    bottom: -100,
+    right: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: colors.primarySoft,
+    opacity: 0.4,
+  },
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    justifyContent: 'space-between',
+  },
+  hero: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  logoCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.background,
-  },
-  brand: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 4,
+    paddingTop: spacing.xl,
   },
   slogan: {
-    fontSize: 22,
-    fontWeight: '700',
+    marginTop: spacing.xl,
+    fontSize: 24,
+    fontWeight: '800',
     color: colors.text,
     textAlign: 'center',
-    marginBottom: spacing.sm,
     writingDirection: 'rtl',
+    lineHeight: 34,
   },
   subtitle: {
+    marginTop: spacing.sm,
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.xxl,
     writingDirection: 'rtl',
+    lineHeight: 22,
+    paddingHorizontal: spacing.md,
+  },
+  chips: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: spacing.xl,
+  },
+  chip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+  },
+  chipIcon: { fontSize: 14 },
+  chipText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   buttons: {
     width: '100%',
     gap: spacing.md,
+    paddingBottom: spacing.sm,
   },
   primaryBtn: {
     backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
+    paddingVertical: 16,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   primaryBtnText: {
     color: colors.background,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
   },
   secondaryBtn: {
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceElevated,
+    paddingVertical: 16,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
@@ -148,6 +202,12 @@ const styles = StyleSheet.create({
   ghostBtnText: {
     color: colors.primary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  footer: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: spacing.sm,
   },
 });
