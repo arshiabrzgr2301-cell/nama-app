@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -38,7 +37,6 @@ jobs:
       - name: Create placeholder assets
         run: |
           mkdir -p assets
-          # Create minimal valid PNGs so Expo prebuild does not fail
           python3 -c "
           import struct, zlib
           def create_png(path, w, h, r, g, b):
