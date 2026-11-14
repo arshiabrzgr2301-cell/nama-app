@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
 import { api } from '../services/api';
-import { saveToken, saveUser } from '../utils/storage';
+import { saveToken, saveRefreshToken, saveUser } from '../utils/storage';
 import LogoMark from '../components/LogoMark';
 
 type Props = {
@@ -37,15 +37,31 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       const res = await api.login(email.trim(), password);
       await saveToken(res.token);
+      await saveRefreshToken(res.refreshToken);
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      if (email.includes('@') && password.length >= 4) {
-        await saveToken('demo-token-' + Date.now());
-        await saveUser({ id: '1', name: 'مشاور دمو', email, officeName: 'دفتر نمونه' });
-        navigation.replace('Dashboard');
+      if (e.code === 'email_not_confirmed') {
+        Alert.alert(
+          'ایمیل هنوز تأیید نشده',
+          'برای فعال شدن حساب، لینک تأیید ارسال‌شده به ایمیلتان را باز کنید. اگر ایمیل را پیدا نمی‌کنید، می‌توانید دوباره ارسالش کنید.',
+          [
+            {
+              text: 'ارسال مجدد ایمیل',
+              onPress: async () => {
+                try {
+                  await api.resendSignupConfirmation(email.trim());
+                  Alert.alert('ارسال شد', 'درخواست ارسال مجدد ثبت شد. پوشه Inbox و Spam ایمیل را بررسی کنید.');
+                } catch (error: any) {
+                  Alert.alert('ارسال ناموفق', error?.message || 'ارسال ایمیل تأیید انجام نشد. کمی بعد دوباره تلاش کنید.');
+                }
+              },
+            },
+            { text: 'باشه', style: 'cancel' },
+          ],
+        );
       } else {
-        Alert.alert('ورود ناموفق', e.message || 'اطلاعات ورود صحیح نیست.');
+        Alert.alert('ورود ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
       }
     } finally {
       setLoading(false);
@@ -118,9 +134,6 @@ export default function LoginScreen({ navigation }: Props) {
             <Text style={styles.link}>حساب ندارید؟ ثبت‌نام دفتر املاک</Text>
           </TouchableOpacity>
 
-          <Text style={styles.hint}>
-            حالت دمو: هر ایمیل معتبر و رمز حداقل ۴ کاراکتر
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -208,11 +221,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
-  },
-  hint: {
-    marginTop: spacing.lg,
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
   },
 });

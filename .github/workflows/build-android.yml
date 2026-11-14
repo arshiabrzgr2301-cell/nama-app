@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+      - fix/remove-demo-fallbacks
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       build_type:
@@ -17,7 +21,7 @@ on:
           - release
 
 concurrency:
-  group: nama-android-build
+  group: nama-android-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -53,6 +57,9 @@ jobs:
         run: |
           npm install --legacy-peer-deps
           echo "Dependencies installed successfully"
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
 
       - name: Create placeholder assets
         run: |

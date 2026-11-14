@@ -1,34 +1,32 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = '@nama_auth_token';
+const REFRESH_TOKEN_KEY = '@nama_refresh_token';
 const USER_KEY = '@nama_user';
 
 export async function saveToken(token: string): Promise<void> {
   await AsyncStorage.setItem(TOKEN_KEY, token);
 }
-
 export async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem(TOKEN_KEY);
 }
-
-export async function removeToken(): Promise<void> {
-  await AsyncStorage.removeItem(TOKEN_KEY);
+export async function saveRefreshToken(token: string): Promise<void> {
+  await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token);
 }
-
+export async function getRefreshToken(): Promise<string | null> {
+  return AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+}
+export async function removeToken(): Promise<void> {
+  await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY]);
+}
 export async function saveUser(user: object): Promise<void> {
   await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
 }
-
 export async function getUser<T = any>(): Promise<T | null> {
   const raw = await AsyncStorage.getItem(USER_KEY);
   if (!raw) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(raw) as T; } catch { return null; }
 }
-
 export async function clearAuth(): Promise<void> {
-  await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+  await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY]);
 }
