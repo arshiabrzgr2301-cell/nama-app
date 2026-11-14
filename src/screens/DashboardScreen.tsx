@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,54 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 };
 
+const formatPrice = (p: number) => {
+  if (p >= 1e9) return (p / 1e9).toFixed(1) + ' میلیارد تومان';
+  if (p >= 1e6) return (p / 1e6).toFixed(0) + ' میلیون تومان';
+  return p.toLocaleString('fa-IR') + ' تومان';
+};
+
+type CardProps = {
+  item: Property;
+  onPress: (id: string) => void;
+  onTour: (id: string, url?: string) => void;
+};
+
+const PropertyCard = memo(function PropertyCard({ item, onPress, onTour }: CardProps) {
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => onPress(item.id)}
+      activeOpacity={0.85}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <View
+          style={[
+            styles.badge,
+            item.status === 'published' ? styles.badgePublished : styles.badgeDraft,
+          ]}
+        >
+          <Text style={styles.badgeText}>
+            {item.status === 'published' ? 'منتشر شده' : 'پیش‌نویس'}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.cardMeta}>
+        {item.city} · {item.area} متر · {item.rooms} خواب
+      </Text>
+      <Text style={styles.cardPrice}>{formatPrice(item.price)}</Text>
+      <View style={styles.cardFooter}>
+        <Text style={styles.views}>👁 {item.views || 0} بازدید تور</Text>
+        <TouchableOpacity onPress={() => onTour(item.id, item.publicTourUrl)}>
+          <Text style={styles.tourLink}>مشاهده تور ←</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function DashboardScreen({ navigation }: Props) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [user, setUser] = useState<any>(null);
@@ -32,7 +80,6 @@ export default function DashboardScreen({ navigation }: Props) {
       const list = await api.getProperties();
       setProperties(list);
     } catch {
-      // داده دمو
       setProperties([
         {
           id: 'demo-1',
@@ -73,13 +120,13 @@ export default function DashboardScreen({ navigation }: Props) {
     }, [load])
   );
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  };
+  }, [load]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     Alert.alert('خروج', 'آیا مطمئن هستید؟', [
       { text: 'انصراف', style: 'cancel' },
       {
@@ -91,54 +138,27 @@ export default function DashboardScreen({ navigation }: Props) {
         },
       },
     ]);
-  };
+  }, [navigation]);
 
-  const formatPrice = (p: number) => {
-    if (p >= 1e9) return (p / 1e9).toFixed(1) + ' میلیارد تومان';
-    if (p >= 1e6) return (p / 1e6).toFixed(0) + ' میلیون تومان';
-    return p.toLocaleString('fa-IR') + ' تومان';
-  };
-
-  const renderItem = ({ item }: { item: Property }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('PropertyDetail', { id: item.id })}
-      activeOpacity={0.85}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <View
-          style={[
-            styles.badge,
-            item.status === 'published' ? styles.badgePublished : styles.badgeDraft,
-          ]}
-        >
-          <Text style={styles.badgeText}>
-            {item.status === 'published' ? 'منتشر شده' : 'پیش‌نویس'}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.cardMeta}>
-        {item.city} · {item.area} متر · {item.rooms} خواب
-      </Text>
-      <Text style={styles.cardPrice}>{formatPrice(item.price)}</Text>
-      <View style={styles.cardFooter}>
-        <Text style={styles.views}>👁 {item.views || 0} بازدید تور</Text>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('TourViewer', {
-              id: item.id,
-              panoramaUrl: item.publicTourUrl,
-            })
-          }
-        >
-          <Text style={styles.tourLink}>مشاهده تور ←</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+  const onCardPress = useCallback(
+    (id: string) => navigation.navigate('PropertyDetail', { id }),
+    [navigation]
   );
+
+  const onTourPress = useCallback(
+    (id: string, url?: string) =>
+      navigation.navigate('TourViewer', { id, panoramaUrl: url }),
+    [navigation]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Property }) => (
+      <PropertyCard item={item} onPress={onCardPress} onTour={onTourPress} />
+    ),
+    [onCardPress, onTourPress]
+  );
+
+  const keyExtractor = useCallback((item: Property) => item.id, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -174,7 +194,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
       <FlatList
         data={properties}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -187,6 +207,12 @@ export default function DashboardScreen({ navigation }: Props) {
         ListEmptyComponent={
           <Text style={styles.empty}>هنوز ملکی ثبت نشده است.</Text>
         }
+        // بهینه‌سازی رندر لیست
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        updateCellsBatchingPeriod={50}
       />
     </SafeAreaView>
   );
