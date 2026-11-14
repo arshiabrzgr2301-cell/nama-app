@@ -57,6 +57,9 @@ jobs:
           npm install --legacy-peer-deps
           echo "Dependencies installed successfully"
 
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
       - name: Create placeholder assets
         run: |
           mkdir -p assets
