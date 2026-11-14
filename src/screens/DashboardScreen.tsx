@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
+import LogoMark from '../components/LogoMark';
 import { api, Property } from '../services/api';
 import { clearAuth, getUser } from '../utils/storage';
 
@@ -155,6 +156,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View pointerEvents="none" style={styles.headerGlow} />
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.greeting} numberOfLines={1}>
@@ -164,6 +166,7 @@ export default function DashboardScreen({ navigation }: Props) {
             {user?.officeName || 'دفتر املاک'}
           </Text>
         </View>
+        <LogoMark size={38} />
         <TouchableOpacity
           onPress={handleLogout}
           style={styles.logoutBtn}
@@ -256,14 +259,17 @@ export default function DashboardScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  headerGlow: { position: 'absolute', top: -110, right: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: '#145B91', opacity: 0.16 },
   header: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
   },
-  headerText: { flex: 1, marginLeft: spacing.md },
+  headerText: { flex: 1, marginHorizontal: spacing.md },
   greeting: {
     fontSize: 20,
     fontWeight: '800',
@@ -293,11 +299,15 @@ const styles = StyleSheet.create({
   statChip: {
     flex: 1,
     backgroundColor: colors.surfaceElevated,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderSoft,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   statValue: {
     fontSize: 16,
