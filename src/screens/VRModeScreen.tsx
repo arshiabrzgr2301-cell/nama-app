@@ -17,24 +17,62 @@ const VR_HTML = (imageUrl: string) => `
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
-  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"><\/script>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
-    #panorama { width: 100%; height: 100%; }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden}
+    #toolbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#111827;color:#fff;font:13px system-ui}
+    #toggle{border:0;border-radius:18px;padding:8px 14px;background:#22d3ee;color:#07111f;font-weight:700}
+    #viewers{height:calc(100% - 48px);display:flex;width:100%}
+    .pane{height:100%;width:100%;min-width:0}
+    #right{display:none}
+    #viewers.split .pane{width:50%}
+    #viewers.split #right{display:block;border-right:1px solid #64748b}
+    #note{position:absolute;bottom:8px;left:8px;right:8px;text-align:center;color:#e2e8f0;background:rgba(0,0,0,.55);padding:6px;border-radius:8px;font:11px system-ui;pointer-events:none}
   </style>
 </head>
 <body>
-  <div id="panorama"></div>
+  <div id="toolbar">
+    <span>نمایش پانورامای ۳۶۰ با حسگر حرکتی</span>
+    <button id="toggle" type="button">حالت عینک</button>
+  </div>
+  <div id="viewers">
+    <div id="left" class="pane"></div>
+    <div id="right" class="pane"></div>
+  </div>
+  <div id="note">برای حالت عینک گوشی را افقی قرار دهید؛ تصویر ورودی تک‌چشمی است و عمق سه‌بعدی واقعی ندارد.</div>
   <script>
-    pannellum.viewer('panorama', {
-      type: 'equirectangular',
-      panorama: ${JSON.stringify(imageUrl)},
-      autoLoad: true,
-      showControls: true,
-      mouseZoom: false,
-      draggable: true,
-      compass: false,
-      orientationOnByDefault: true
+    const panorama = ${JSON.stringify(imageUrl)};
+    const config = {
+      type:'equirectangular',
+      panorama,
+      autoLoad:true,
+      showControls:true,
+      mouseZoom:false,
+      draggable:true,
+      compass:false,
+      orientationOnByDefault:true
+    };
+    const left = pannellum.viewer('left', config);
+    const right = pannellum.viewer('right', config);
+    let syncing = false;
+    function sync(source, target, method, value) {
+      if (syncing || !Number.isFinite(value)) return;
+      syncing = true;
+      target[method](value, false);
+      syncing = false;
+    }
+    left.on('yawchange', value => sync(left,right,'setYaw',value));
+    right.on('yawchange', value => sync(right,left,'setYaw',value));
+    left.on('pitchchange', value => sync(left,right,'setPitch',value));
+    right.on('pitchchange', value => sync(right,left,'setPitch',value));
+    document.getElementById('toggle').addEventListener('click', () => {
+      const split = document.getElementById('viewers').classList.toggle('split');
+      document.getElementById('toggle').textContent = split ? 'نمایش عادی' : 'حالت عینک';
+      setTimeout(() => {
+        left.resize();
+        right.resize();
+      }, 80);
     });
   </script>
 </body>
