@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/remove-demo-fallbacks
+      - feat/org-unlimited-subscriptions
   pull_request:
     branches:
       - main
