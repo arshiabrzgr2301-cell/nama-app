@@ -43,10 +43,12 @@ const PANNELLUM_HTML = (imageUrl: string, hotspots: Hotspot[]) => `
     let moved = false;
     document.getElementById('panorama').addEventListener('touchstart', () => { moved = false; }, {passive:true});
     document.getElementById('panorama').addEventListener('touchmove', () => { moved = true; }, {passive:true});
-    document.getElementById('panorama').addEventListener('click', () => {
+    document.getElementById('panorama').addEventListener('click', (event) => {
       if (window.ReactNativeWebView) {
+        // Convert the exact screen tap into panorama coordinates (pitch, yaw).
+        const coords = viewer.mouseEventToCoords(event);
         window.ReactNativeWebView.postMessage(JSON.stringify({
-          type:'position', yaw:viewer.getYaw(), pitch:viewer.getPitch()
+          type:'position', pitch:coords[0], yaw:coords[1]
         }));
       }
     });
