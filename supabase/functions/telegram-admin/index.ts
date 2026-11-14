@@ -18,7 +18,8 @@ async function db(path: string, init: RequestInit = {}) {
 }
 function makePassword() {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
-  return Array.from(bytes, b => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@"[b % 62]).join("");
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@";
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
 }
 async function createUser(orgId: string, username: string, fullName: string, role: "owner" | "consultant") {
   const clean = username.trim().toLowerCase();
