@@ -3,7 +3,6 @@
   "exclude": ["supabase/functions"],
   "compilerOptions": {
     "strict": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
