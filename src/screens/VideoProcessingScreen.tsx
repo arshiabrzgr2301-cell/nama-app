@@ -83,7 +83,7 @@ export default function VideoProcessingScreen({ navigation, route }: Props) {
           <View key={job.id} style={styles.job}>
             <Text style={styles.jobTitle}>{modeLabel[job.processing_mode]}</Text>
             <Text style={styles.jobStatus}>{statusLabel[job.status]} · {job.progress}%</Text>
-            <View style={styles.track}><View style={[styles.fill, { width: job.progress + '%' }]} /></View>
+            <View style={styles.track}><View style={[styles.fill, { width: `${job.progress}%` }]} /></View>
             {job.status === 'queued' ? <Text style={styles.note}>موتور پردازش GPU هنوز به پروژه متصل نشده است؛ پس از راه‌اندازی worker این درخواست‌ها پردازش می‌شوند.</Text> : null}
             {job.status === 'failed' && job.error_message ? <Text style={styles.error}>{job.error_message}</Text> : null}
             {job.spatial_asset_path ? <Text style={styles.output}>خروجی سه‌بعدی آماده است.</Text> : null}
