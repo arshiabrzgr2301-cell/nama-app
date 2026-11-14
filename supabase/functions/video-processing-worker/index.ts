@@ -25,7 +25,9 @@ const headers = {
 };
 
 async function db(path: string, init: RequestInit = {}) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...init, headers: { ...headers, ...(init.headers || {}) } });
+  const requestHeaders = new Headers(headers);
+  new Headers(init.headers).forEach((value, key) => requestHeaders.set(key, value));
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...init, headers: requestHeaders });
   const body = await response.text();
   if (!response.ok) throw new Error(`database request failed: ${response.status} ${body}`);
   return body ? JSON.parse(body) : [];
