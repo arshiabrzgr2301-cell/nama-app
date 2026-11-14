@@ -28,12 +28,13 @@ const VR_HTML = (imageUrl: string) => `
   <script>
     pannellum.viewer('panorama', {
       type: 'equirectangular',
-      panorama: '${imageUrl}',
+      panorama: ${JSON.stringify(imageUrl)},
       autoLoad: true,
-      showControls: false,
+      showControls: true,
       mouseZoom: false,
       draggable: true,
-      compass: false
+      compass: false,
+      orientationOnByDefault: true
     });
   </script>
 </body>
@@ -61,7 +62,7 @@ export default function VRModeScreen({ navigation, route }: Props) {
         </View>
       )}
       <TouchableOpacity style={styles.exit} onPress={() => navigation.goBack()}>
-        <Text style={styles.exitText}>خروج از نمایش ۳۶۰</Text>
+        <Text style={styles.exitText}>خروج از حالت حرکت ۳۶۰</Text>
       </TouchableOpacity>
     </View>
   );
