@@ -57,3 +57,40 @@ grant all on public.video_processing_jobs to service_role;
 
 comment on table public.video_processing_jobs is
   'Asynchronous GPU jobs for spatial 3D reconstruction (Gaussian Splatting/NeRF) and stereo video generation. Worker-only writes.';
+
+
+-- Atomically claim the oldest queued job. This RPC is callable by service_role only.
+create or replace function public.nama_claim_video_processing_job()
+returns setof public.video_processing_jobs
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare claimed public.video_processing_jobs;
+begin
+  select * into claimed
+  from public.video_processing_jobs
+  where status = 'queued'
+  order by created_at asc
+  for update skip locked
+  limit 1;
+
+  if claimed.id is null then
+    return;
+  end if;
+
+  update public.video_processing_jobs
+  set status = 'processing',
+      progress = greatest(progress, 1),
+      started_at = coalesce(started_at, now()),
+      updated_at = now(),
+      error_message = null
+  where id = claimed.id
+  returning * into claimed;
+
+  return next claimed;
+end;
+$$;
+
+revoke all on function public.nama_claim_video_processing_job() from public, anon, authenticated;
+grant execute on function public.nama_claim_video_processing_job() to service_role;
