@@ -6,10 +6,10 @@ import { I18nManager, ActivityIndicator, View } from 'react-native';
 import { RootStackParamList } from '../types';
 import { colors } from '../theme';
 import { getToken } from '../utils/storage';
+import { api } from '../services/api';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import AddPropertyScreen from '../screens/AddPropertyScreen';
 import PropertyDetailScreen from '../screens/PropertyDetailScreen';
@@ -35,7 +35,8 @@ export default function AppNavigator() {
   useEffect(() => {
     (async () => {
       const token = await getToken();
-      setInitialRoute(token ? 'Dashboard' : 'Home');
+      const hasAccess = token ? await api.validateMembership() : false;
+      setInitialRoute(hasAccess ? 'Dashboard' : 'Home');
     })();
   }, []);
 
@@ -60,7 +61,6 @@ export default function AppNavigator() {
       >
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
         <Stack.Screen name="PropertyDetail" component={PropertyDetailScreen} />

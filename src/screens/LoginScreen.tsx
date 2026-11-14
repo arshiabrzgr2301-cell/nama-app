@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
 import { api } from '../services/api';
-import { saveToken, saveUser } from '../utils/storage';
+import { saveToken, saveRefreshToken, saveUser } from '../utils/storage';
 import LogoMark from '../components/LogoMark';
 
 type Props = {
@@ -24,29 +24,24 @@ type Props = {
 };
 
 export default function LoginScreen({ navigation }: Props) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('خطا', 'لطفاً ایمیل و رمز عبور را وارد کنید.');
+    if (!username.trim() || !password) {
+      Alert.alert('خطا', 'لطفاً نام کاربری و رمز عبور را وارد کنید.');
       return;
     }
     setLoading(true);
     try {
-      const res = await api.login(email.trim(), password);
+      const res = await api.login(username.trim(), password);
       await saveToken(res.token);
+      await saveRefreshToken(res.refreshToken);
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      if (email.includes('@') && password.length >= 4) {
-        await saveToken('demo-token-' + Date.now());
-        await saveUser({ id: '1', name: 'مشاور دمو', email, officeName: 'دفتر نمونه' });
-        navigation.replace('Dashboard');
-      } else {
-        Alert.alert('ورود ناموفق', e.message || 'اطلاعات ورود صحیح نیست.');
-      }
+      Alert.alert('ورود ناموفق', e.message || 'نام کاربری یا رمز عبور نادرست است.');
     } finally {
       setLoading(false);
     }
@@ -77,14 +72,13 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.label}>ایمیل</Text>
+            <Text style={styles.label}>نام کاربری</Text>
             <TextInput
               style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="example@office.ir"
+              value={username}
+              onChangeText={setUsername}
+              placeholder="نام کاربری دریافتی از مدیر دفتر"
               placeholderTextColor={colors.textMuted}
-              keyboardType="email-address"
               autoCapitalize="none"
               textAlign="right"
             />
@@ -114,13 +108,7 @@ export default function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.link}>حساب ندارید؟ ثبت‌نام دفتر املاک</Text>
-          </TouchableOpacity>
 
-          <Text style={styles.hint}>
-            حالت دمو: هر ایمیل معتبر و رمز حداقل ۴ کاراکتر
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -208,11 +196,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
-  },
-  hint: {
-    marginTop: spacing.lg,
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
   },
 });

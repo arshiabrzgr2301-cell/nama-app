@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  TextInput,
-  Modal,
+  View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -14,49 +8,64 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
-import { api } from '../services/api';
+import { api, Property, Hotspot } from '../services/api';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'TourViewer'>;
   route: RouteProp<RootStackParamList, 'TourViewer'>;
 };
 
-// یک تور ۳۶۰ ساده با Pannellum (open source) از طریق WebView
-const PANNELLUM_HTML = (imageUrl: string) => `
+const PANNELLUM_HTML = (imageUrl: string, hotspots: Hotspot[]) => `
 <!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
   <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-  <style>
-    body { margin: 0; background: #000; }
-    #panorama { width: 100vw; height: 100vh; }
-  </style>
+  <style>html,body,#panorama{margin:0;width:100%;height:100%;background:#000;overflow:hidden}</style>
 </head>
 <body>
   <div id="panorama"></div>
   <script>
+    const initialHotspots = ${JSON.stringify(hotspots.map(h => ({
+      id: h.id, pitch: h.pitch, yaw: h.yaw, type: 'info', text: h.title,
+      ...(h.description ? { description: h.description } : {})
+    })))};
     const viewer = pannellum.viewer('panorama', {
       type: 'equirectangular',
-      panorama: '${imageUrl}',
+      panorama: ${JSON.stringify(imageUrl)},
       autoLoad: true,
       showControls: true,
       compass: true,
-      hotSpots: []
+      hotSpots: initialHotspots
     });
     window.viewer = viewer;
+    let moved = false;
+    document.getElementById('panorama').addEventListener('touchstart', () => { moved = false; }, {passive:true});
+    document.getElementById('panorama').addEventListener('touchmove', () => { moved = true; }, {passive:true});
+    document.getElementById('panorama').addEventListener('click', (event) => {
+      if (window.ReactNativeWebView) {
+        // Convert the exact screen tap into panorama coordinates (pitch, yaw).
+        const coords = viewer.mouseEventToCoords(event);
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type:'position', pitch:coords[0], yaw:coords[1]
+        }));
+      }
+    });
     document.addEventListener('message', function(e) {
       try {
         const data = JSON.parse(e.data);
-        if (data.type === 'addHotspot') {
-          viewer.addHotSpot({
-            pitch: data.pitch,
-            yaw: data.yaw,
-            type: 'info',
-            text: data.title
-          });
-        }
+        if (data.type === 'addHotspot') viewer.addHotSpot({
+          pitch:data.pitch, yaw:data.yaw, type:'info', text:data.title
+        });
+      } catch(err) {}
+    });
+    window.addEventListener('message', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'addHotspot') viewer.addHotSpot({
+          pitch:data.pitch, yaw:data.yaw, type:'info', text:data.title
+        });
       } catch(err) {}
     });
   </script>
@@ -65,42 +74,71 @@ const PANNELLUM_HTML = (imageUrl: string) => `
 `;
 
 export default function TourViewerScreen({ navigation, route }: Props) {
-  const { id, panoramaUrl } = route.params;
+  const { id } = route.params;
+  const [property, setProperty] = useState<Property | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showHotspotModal, setShowHotspotModal] = useState(false);
   const [hotspotTitle, setHotspotTitle] = useState('');
+  const [pendingPosition, setPendingPosition] = useState<{yaw:number; pitch:number} | null>(null);
   const [webRef, setWebRef] = useState<WebView | null>(null);
 
-  // تصویر نمونه پانوراما برای دمو (یک equirectangular عمومی)
-  const demoPanorama =
-    'https://pannellum.org/images/alma.jpg';
-
   useEffect(() => {
+    let active = true;
+    api.getProperty(id).then(value => {
+      if (active) setProperty(value);
+    }).catch((error: any) => {
+      Alert.alert('خطا در دریافت تور', error?.message || 'اطلاعات ملک دریافت نشد.');
+      navigation.goBack();
+    }).finally(() => { if (active) setLoading(false); });
     api.incrementViews(id).catch(() => {});
-  }, [id]);
+    return () => { active = false; };
+  }, [id, navigation]);
 
-  const addHotspot = () => {
+  const handleWebMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'position' && Number.isFinite(data.yaw) && Number.isFinite(data.pitch)) {
+        setPendingPosition({ yaw: data.yaw, pitch: data.pitch });
+        setShowHotspotModal(true);
+      }
+    } catch {}
+  };
+
+  const addHotspot = async () => {
     if (!hotspotTitle.trim()) {
       Alert.alert('خطا', 'عنوان هات‌اسپات را وارد کنید.');
       return;
     }
-    // در دمو، هات‌اسپات در موقعیت پیش‌فرض اضافه می‌شود
-    webRef?.injectJavaScript(`
-      if (window.viewer) {
-        window.viewer.addHotSpot({
-          pitch: 0,
-          yaw: 0,
-          type: 'info',
-          text: ${JSON.stringify(hotspotTitle.trim())}
+    if (!pendingPosition) {
+      Alert.alert('موقعیت انتخاب نشده', 'ابتدا روی نقطه موردنظر در تصویر ۳۶۰ ضربه بزنید.');
+      return;
+    }
+    try {
+      const saved = await api.addHotspot(id, {
+        ...pendingPosition, title: hotspotTitle.trim(),
+      });
+      setProperty(current => current
+        ? { ...current, hotspots: [...(current.hotspots || []), saved] }
+        : current);
+      webRef?.injectJavaScript(`
+        if (window.viewer) window.viewer.addHotSpot({
+          pitch:${JSON.stringify(saved.pitch)},
+          yaw:${JSON.stringify(saved.yaw)},
+          type:'info',
+          text:${JSON.stringify(saved.title)}
         });
-      }
-      true;
-    `);
-    api.addHotspot(id, { yaw: 0, pitch: 0, title: hotspotTitle.trim() }).catch(() => {});
-    setShowHotspotModal(false);
-    setHotspotTitle('');
-    Alert.alert('موفق', 'هات‌اسپات اضافه شد.');
+        true;
+      `);
+      setShowHotspotModal(false);
+      setHotspotTitle('');
+      setPendingPosition(null);
+      Alert.alert('موفق', 'هات‌اسپات در همین موقعیت ذخیره شد.');
+    } catch (error: any) {
+      Alert.alert('ذخیره هات‌اسپات ناموفق', error?.message || 'تغییری ذخیره نشد.');
+    }
   };
 
+  const panoramaUrl = property?.panoramaUrl;
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.toolbar}>
@@ -109,40 +147,48 @@ export default function TourViewerScreen({ navigation, route }: Props) {
         </TouchableOpacity>
         <Text style={styles.toolTitle}>تور ۳۶۰</Text>
         <View style={styles.toolRight}>
-          <TouchableOpacity onPress={() => setShowHotspotModal(true)}>
+          <TouchableOpacity disabled={!panoramaUrl} onPress={() => {
+            if (!panoramaUrl) return;
+            Alert.alert('افزودن هات‌اسپات', 'روی نقطه موردنظر در تصویر ضربه بزنید تا موقعیت ثبت شود.');
+          }}>
             <Text style={styles.toolBtn}>+ هات‌اسپات</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate('VRMode', { id, panoramaUrl: panoramaUrl || demoPanorama })
-            }
-          >
-            <Text style={[styles.toolBtn, { color: colors.primary }]}>VR</Text>
+          <TouchableOpacity disabled={!panoramaUrl} onPress={() => {
+            if (panoramaUrl) navigation.navigate('VRMode', { id, panoramaUrl });
+          }}>
+            <Text style={[styles.toolBtn, { color: colors.primary }]}>حالت حرکت</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <WebView
-        ref={setWebRef}
-        originWhitelist={['*']}
-        source={{ html: PANNELLUM_HTML(panoramaUrl || demoPanorama) }}
-        style={styles.webview}
-        javaScriptEnabled
-        domStorageEnabled
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-      />
+      {loading ? (
+        <View style={styles.message}><Text style={styles.messageText}>در حال بارگذاری تور...</Text></View>
+      ) : panoramaUrl ? (
+        <WebView
+          ref={setWebRef}
+          originWhitelist={['*']}
+          source={{ html: PANNELLUM_HTML(panoramaUrl, property?.hotspots || []) }}
+          style={styles.webview}
+          javaScriptEnabled
+          domStorageEnabled
+          allowsInlineMediaPlayback
+          onMessage={handleWebMessage}
+        />
+      ) : (
+        <View style={styles.message}>
+          <Text style={styles.messageText}>برای این ملک هنوز تصویر پانورامای ۳۶۰ آپلود نشده است.</Text>
+        </View>
+      )}
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          لینک عمومی تور برای مشتری در دسترس است.
-        </Text>
+        <Text style={styles.footerText}>هات‌اسپات‌ها با موقعیت واقعی ذخیره می‌شوند.</Text>
       </View>
 
       <Modal visible={showHotspotModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>افزودن هات‌اسپات</Text>
+            <Text style={styles.footerText}>موقعیت انتخاب‌شده: {pendingPosition ? `Yaw ${pendingPosition.yaw.toFixed(1)}° · Pitch ${pendingPosition.pitch.toFixed(1)}°` : '—'}</Text>
             <TextInput
               style={styles.modalInput}
               value={hotspotTitle}
@@ -152,14 +198,13 @@ export default function TourViewerScreen({ navigation, route }: Props) {
               textAlign="right"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setShowHotspotModal(false)}
-              >
+              <TouchableOpacity style={styles.modalCancel} onPress={() => {
+                setShowHotspotModal(false); setPendingPosition(null);
+              }}>
                 <Text style={styles.modalCancelText}>انصراف</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalOk} onPress={addHotspot}>
-                <Text style={styles.modalOkText}>افزودن</Text>
+                <Text style={styles.modalOkText}>ذخیره</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -183,6 +228,8 @@ const styles = StyleSheet.create({
   toolTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   toolRight: { flexDirection: 'row-reverse', gap: 16 },
   webview: { flex: 1 },
+  message: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  messageText: { color: colors.text, fontSize: 15, textAlign: 'center' },
   footer: {
     padding: spacing.sm,
     backgroundColor: colors.surface,

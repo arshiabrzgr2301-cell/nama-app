@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   Share,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,22 +29,9 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
     api
       .getProperty(id)
       .then(setProperty)
-      .catch(() => {
-        setProperty({
-          id,
-          title: 'آپارتمان نمونه',
-          city: 'تهران',
-          address: 'سعادت‌آباد',
-          price: 18500000000,
-          area: 145,
-          rooms: 3,
-          floor: 5,
-          description: 'نورگیر عالی، بازسازی کامل، دسترسی عالی به مترو.',
-          status: 'published',
-          views: 42,
-          publicTourUrl: 'https://nama.ir/t/' + id,
-          createdAt: new Date().toISOString(),
-        });
+      .catch((error: any) => {
+        Alert.alert('خطا', error?.message || 'دریافت اطلاعات ملک ناموفق بود.');
+        navigation.goBack();
       });
   }, [id]);
 
@@ -61,13 +49,28 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
   };
 
   const shareTour = async () => {
-    const url = property.publicTourUrl || `https://nama.ir/t/${property.id}`;
+    const url = property.publicTourUrl;
+    if (!url) {
+      Alert.alert('لینک در دسترس نیست', 'ابتدا ملک را منتشر کنید تا لینک عمومی تور ساخته شود.');
+      return;
+    }
     try {
       await Share.share({
         message: `تور مجازی ملک «${property.title}» را ببینید:\n${url}`,
         url,
       });
-    } catch {}
+    } catch (error: any) {
+      Alert.alert('اشتراک‌گذاری ناموفق', error?.message || '');
+    }
+  };
+
+  const openVideo = async () => {
+    if (!property.videoUrl) return;
+    try {
+      await Linking.openURL(property.videoUrl);
+    } catch (error: any) {
+      Alert.alert('پخش ویدیو ناموفق', error?.message || 'امکان باز کردن ویدیو وجود ندارد.');
+    }
   };
 
   const toggleStatus = async () => {
@@ -79,11 +82,8 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         await api.publishProperty(id);
         setProperty({ ...property, status: 'published' });
       }
-    } catch {
-      setProperty({
-        ...property,
-        status: property.status === 'published' ? 'draft' : 'published',
-      });
+    } catch (error: any) {
+      Alert.alert('عملیات ناموفق', error?.message || 'وضعیت ملک تغییر نکرد.');
     }
   };
 
@@ -133,15 +133,21 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
           onPress={() =>
             navigation.navigate('TourViewer', {
               id: property.id,
-              panoramaUrl: property.publicTourUrl,
+              panoramaUrl: property.panoramaUrl,
             })
           }
         >
           <Text style={styles.primaryBtnText}>مشاهده تور ۳۶۰</Text>
         </TouchableOpacity>
 
+        {property.videoUrl ? (
+          <TouchableOpacity style={styles.secondaryBtn} onPress={openVideo}>
+            <Text style={styles.secondaryBtnText}>مشاهده ویدیوی اسکن خانه</Text>
+          </TouchableOpacity>
+        ) : null}
+
         <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}>
-          <Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور</Text>
+          <Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور ۳۶۰</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={toggleStatus}>

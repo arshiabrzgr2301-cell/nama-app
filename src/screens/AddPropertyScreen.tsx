@@ -90,11 +90,8 @@ export default function AddPropertyScreen({ navigation }: Props) {
       Alert.alert('موفق', asDraft ? 'ملک به‌عنوان پیش‌نویس ذخیره شد.' : 'ملک منتشر شد.', [
         { text: 'باشه', onPress: () => navigation.goBack() },
       ]);
-    } catch {
-      // دمو
-      Alert.alert('موفق (دمو)', 'ملک در حالت دمو ذخیره شد.', [
-        { text: 'باشه', onPress: () => navigation.goBack() },
-      ]);
+    } catch (e: any) {
+      Alert.alert('ذخیره ناموفق', e.message || 'ملک ذخیره نشد. ارتباط با سرور را بررسی کنید.');
     } finally {
       setLoading(false);
     }
