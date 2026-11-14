@@ -222,9 +222,12 @@ export const api = {
     return { id: h.id, yaw: h.yaw, pitch: h.pitch, title: h.title, description: h.description || undefined };
   },
   incrementViews: async (id: string) => {
-    const views = await request<number>('/rest/v1/rpc/increment_property_views', {
-      method: 'POST', body: JSON.stringify({ property_uuid: id }),
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_property_views`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ property_uuid: id }),
     });
-    return { views };
+    if (!res.ok) throw await parseError(res);
+    return { views: await res.json() as number };
   },
 };
