@@ -6,9 +6,8 @@ on:
       - main
       - fix/remove-demo-fallbacks
       - feat/org-unlimited-subscriptions
+      - chore/expo-sdk-58-upgrade
   pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       build_type:
@@ -40,10 +39,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22.13
         uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22.13.1'
 
       - name: Setup Java 17
         uses: actions/setup-java@v5
@@ -59,8 +58,8 @@ jobs:
           npm install --legacy-peer-deps
           echo "Dependencies installed successfully"
 
-      - name: TypeScript type check
-        run: npx tsc --noEmit
+      - name: Verify Expo dependency alignment
+        run: npx expo install --check
 
       - name: Create placeholder assets
         run: |
@@ -87,6 +86,12 @@ jobs:
           PY
           ls -lh assets/
 
+      - name: Expo Doctor
+        run: npx expo-doctor@latest
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
       - name: Prebuild Android project
         run: |
           npx expo prebuild --platform android --no-install
@@ -95,7 +100,7 @@ jobs:
       - name: Embed JS bundle (standalone APK without Metro)
         run: |
           mkdir -p android/app/src/main/assets
-          npx react-native bundle \
+          npx expo export:embed \
             --platform android \
             --dev false \
             --entry-file index.js \
