@@ -84,6 +84,19 @@ jobs:
           npx expo prebuild --platform android --no-install
           echo "Expo prebuild completed"
 
+      - name: Embed JS bundle (standalone APK without Metro)
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res \
+            --reset-cache
+          ls -lh android/app/src/main/assets/index.android.bundle
+          echo "JS bundle embedded"
+
       - name: Prepare signing (release)
         id: signing
         run: |
@@ -98,7 +111,6 @@ jobs:
             echo "mode=release-keystore" >> $GITHUB_OUTPUT
           else
             echo "No ANDROID_KEYSTORE_BASE64 secret — release will be signed with Android debug keystore (OK for testing, not for stores)"
-            # ensure debug keystore exists on runner
             mkdir -p $HOME/.android
             if [ ! -f $HOME/.android/debug.keystore ]; then
               keytool -genkeypair -v \
