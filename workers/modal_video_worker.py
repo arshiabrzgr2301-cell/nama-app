@@ -194,55 +194,65 @@ def make_spatial(source: Path, output_dir: Path, work: Path):
 @app.function(image=image, gpu="L4", timeout=7200, max_containers=1,
               secrets=[worker_secret])
 def process_video(job: dict, input_video_url: str):
-    job_id = job["id"]
-    owner_id = job.get("owner_id")
-    property_id = job["property_id"]
-    prefix = f"{owner_id}/{property_id}/derived/{job_id}"
-    with tempfile.TemporaryDirectory(prefix="nama-") as temp:
-        work = Path(temp)
-        source = work / "source-video"
-        response = requests.get(input_video_url, stream=True, timeout=300)
-        response.raise_for_status()
-        with source.open("wb") as stream:
-            for chunk in response.iter_content(1024 * 1024):
-                if chunk:
-                    stream.write(chunk)
-        if source.stat().st_size < 1024 * 100:
-            raise RuntimeError("فایل ویدیوی ورودی خالی یا بیش از حد کوچک است.")
+    job_id = job.get("id", "")
+    try:
+        job_id = job["id"]
+        owner_id = job.get("owner_id")
+        if not owner_id:
+            raise RuntimeError("Claim response did not include the property owner id.")
+        property_id = job["property_id"]
+        prefix = f"{owner_id}/{property_id}/derived/{job_id}"
+        with tempfile.TemporaryDirectory(prefix="nama-") as temp:
+            work = Path(temp)
+            source = work / "source-video"
+            response = requests.get(input_video_url, stream=True, timeout=300)
+            response.raise_for_status()
+            with source.open("wb") as stream:
+                for chunk in response.iter_content(1024 * 1024):
+                    if chunk:
+                        stream.write(chunk)
+            if source.stat().st_size < 1024 * 100:
+                raise RuntimeError("فایل ویدیوی ورودی خالی یا بیش از حد کوچک است.")
 
-        mode = job["processing_mode"]
-        spatial_path = None
-        stereo_path = None
-        metadata = {
-            "source_type": "monocular_phone_video",
-            "warnings": [
-                "عمق ویدیوی VR با هوش مصنوعی تخمین زده می‌شود و استریوی واقعی دوربین دوچشمی نیست."
-            ]
-        }
-        control("progress", job_id=job_id, progress=5)
+            mode = job["processing_mode"]
+            spatial_path = None
+            stereo_path = None
+            metadata = {
+                "source_type": "monocular_phone_video",
+                "warnings": [
+                    "عمق ویدیوی VR با هوش مصنوعی تخمین زده می‌شود و استریوی واقعی دوربین دوچشمی نیست."
+                ]
+            }
+            control("progress", job_id=job_id, progress=5)
 
-        if mode in ("stereo", "both"):
-            stereo_file = work / "stereo-sbs.mp4"
-            stereo_meta = make_stereo(source, stereo_file, work)
-            stereo_path = f"{prefix}/stereo-sbs.mp4"
-            storage_upload(stereo_file, stereo_path, "video/mp4")
-            metadata["stereo"] = stereo_meta
-            control("progress", job_id=job_id, progress=55 if mode == "both" else 90)
+            if mode in ("stereo", "both"):
+                stereo_file = work / "stereo-sbs.mp4"
+                stereo_meta = make_stereo(source, stereo_file, work)
+                stereo_path = f"{prefix}/stereo-sbs.mp4"
+                storage_upload(stereo_file, stereo_path, "video/mp4")
+                metadata["stereo"] = stereo_meta
+                control("progress", job_id=job_id, progress=55 if mode == "both" else 90)
 
-        if mode in ("spatial", "both"):
-            spatial_dir = work / "spatial"
-            spatial_meta = make_spatial(source, spatial_dir, work)
-            spatial_path = f"{prefix}/scene.json"
-            storage_upload(spatial_dir / "scene.json", spatial_path, "application/json")
-            storage_upload(spatial_dir / "scene.ply", f"{prefix}/scene.ply",
-                           "application/octet-stream")
-            metadata["spatial"] = spatial_meta
-            control("progress", job_id=job_id, progress=95)
+            if mode in ("spatial", "both"):
+                spatial_dir = work / "spatial"
+                spatial_meta = make_spatial(source, spatial_dir, work)
+                spatial_path = f"{prefix}/scene.json"
+                storage_upload(spatial_dir / "scene.json", spatial_path, "application/json")
+                storage_upload(spatial_dir / "scene.ply", f"{prefix}/scene.ply",
+                               "application/octet-stream")
+                metadata["spatial"] = spatial_meta
+                control("progress", job_id=job_id, progress=95)
 
-        control("complete", job_id=job_id,
-                spatial_asset_path=spatial_path, stereo_video_path=stereo_path,
-                metadata=metadata)
+            control("complete", job_id=job_id,
+                    spatial_asset_path=spatial_path, stereo_video_path=stereo_path,
+                    metadata=metadata)
 
+    except Exception as exc:
+        try:
+            control("fail", job_id=job_id, error_message=str(exc)[:900])
+        except Exception as callback_error:
+            print(f"Could not report failed NAMA job {job_id}: {type(callback_error).__name__}")
+        raise
 
 @app.function(image=modal.Image.debian_slim(python_version="3.11").pip_install("requests"),
               schedule=modal.Period(minutes=1), timeout=90, secrets=[worker_secret])
