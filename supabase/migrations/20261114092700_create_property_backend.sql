@@ -13,8 +13,8 @@ create table if not exists public.properties (
   floor integer not null default 0,
   description text not null default '',
   status text not null default 'draft' check (status in ('draft','published')),
-  panorama_url text,
-  video_url text,
+  panorama_path text,
+  video_path text,
   views bigint not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -72,9 +72,9 @@ revoke all on function public.increment_property_views(uuid) from public;
 grant execute on function public.increment_property_views(uuid) to anon, authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('property-media', 'property-media', true, 524288000,
+values ('property-media', 'property-media', false, 524288000,
   array['image/jpeg','image/png','image/webp','image/heic','video/mp4','video/quicktime','video/webm'])
-on conflict (id) do update set public = true, file_size_limit = 524288000,
+on conflict (id) do update set public = false, file_size_limit = 524288000,
   allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "Users upload own property media" on storage.objects;
