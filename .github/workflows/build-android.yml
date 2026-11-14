@@ -19,6 +19,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          # بدون cache: چون package-lock.json در ریپو نیست
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -27,7 +28,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install dependencies
         run: |
