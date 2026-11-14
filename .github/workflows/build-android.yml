@@ -21,7 +21,7 @@ on:
           - release
 
 concurrency:
-  group: nama-android-build
+  group: nama-android-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
