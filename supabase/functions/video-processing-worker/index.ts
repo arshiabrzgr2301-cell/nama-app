@@ -45,6 +45,9 @@ Deno.serve(async (req: Request) => {
       const rows = await db("rpc/nama_claim_video_processing_job", { method: "POST", body: "{}" });
       const job = rows[0];
       if (!job) return json({ job: null });
+      const propertyRows = await db(`properties?select=owner_id&id=eq.${job.property_id}&limit=1`);
+      const ownerId = propertyRows[0]?.owner_id;
+      if (!ownerId) throw new Error("claimed_job_property_owner_missing");
       const signed = await fetch(
         `${SUPABASE_URL}/storage/v1/object/sign/property-media/${job.input_video_path}`,
         { method: "POST", headers, body: JSON.stringify({ expiresIn: 3600 }) },
@@ -56,7 +59,7 @@ Deno.serve(async (req: Request) => {
         ? signedPath
         : signedPath ? `${SUPABASE_URL}/storage/v1${signedPath}` : null;
       if (!inputVideoUrl) throw new Error("signed_input_url_missing");
-      return json({ job, input_video_url: inputVideoUrl });
+      return json({ job: { ...job, owner_id: ownerId }, input_video_url: inputVideoUrl });
     }
 
     if (typeof body.job_id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.job_id)) {
