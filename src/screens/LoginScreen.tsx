@@ -41,7 +41,28 @@ export default function LoginScreen({ navigation }: Props) {
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      Alert.alert('ورود ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
+      if (e.code === 'email_not_confirmed') {
+        Alert.alert(
+          'ایمیل هنوز تأیید نشده',
+          'برای فعال شدن حساب، لینک تأیید ارسال‌شده به ایمیلتان را باز کنید. اگر ایمیل را پیدا نمی‌کنید، می‌توانید دوباره ارسالش کنید.',
+          [
+            {
+              text: 'ارسال مجدد ایمیل',
+              onPress: async () => {
+                try {
+                  await api.resendSignupConfirmation(email.trim());
+                  Alert.alert('ارسال شد', 'درخواست ارسال مجدد ثبت شد. پوشه Inbox و Spam ایمیل را بررسی کنید.');
+                } catch (error: any) {
+                  Alert.alert('ارسال ناموفق', error?.message || 'ارسال ایمیل تأیید انجام نشد. کمی بعد دوباره تلاش کنید.');
+                }
+              },
+            },
+            { text: 'باشه', style: 'cancel' },
+          ],
+        );
+      } else {
+        Alert.alert('ورود ناموفق', e.message || 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
+      }
     } finally {
       setLoading(false);
     }
