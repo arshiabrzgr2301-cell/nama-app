@@ -61,12 +61,6 @@ jobs:
       - name: Verify Expo dependency alignment
         run: npx expo install --check
 
-      - name: Expo Doctor
-        run: npx expo-doctor@latest
-
-      - name: TypeScript type check
-        run: npx tsc --noEmit
-
       - name: Create placeholder assets
         run: |
           mkdir -p assets
@@ -91,6 +85,12 @@ jobs:
           print('Placeholder assets created')
           PY
           ls -lh assets/
+
+      - name: Expo Doctor
+        run: npx expo-doctor@latest
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
 
       - name: Prebuild Android project
         run: |
