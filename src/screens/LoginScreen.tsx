@@ -17,6 +17,7 @@ import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
 import { api } from '../services/api';
 import { saveToken, saveUser } from '../utils/storage';
+import LogoMark from '../components/LogoMark';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -39,7 +40,6 @@ export default function LoginScreen({ navigation }: Props) {
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
-      // برای دمو بدون بک‌اند واقعی
       if (email.includes('@') && password.length >= 4) {
         await saveToken('demo-token-' + Date.now());
         await saveUser({ id: '1', name: 'مشاور دمو', email, officeName: 'دفتر نمونه' });
@@ -54,19 +54,29 @@ export default function LoginScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.bgGlow} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>← بازگشت</Text>
+            <Text style={styles.backText}>→ بازگشت</Text>
           </TouchableOpacity>
 
-          <Text style={styles.title}>ورود مشاور</Text>
-          <Text style={styles.subtitle}>به حساب کاربری دفتر املاک خود وارد شوید</Text>
+          <View style={styles.header}>
+            <LogoMark size={64} />
+            <Text style={styles.title}>ورود مشاور</Text>
+            <Text style={styles.subtitle}>
+              به حساب کاربری دفتر املاک خود وارد شوید
+            </Text>
+          </View>
 
-          <View style={styles.form}>
+          <View style={styles.card}>
             <Text style={styles.label}>ایمیل</Text>
             <TextInput
               style={styles.input}
@@ -94,19 +104,23 @@ export default function LoginScreen({ navigation }: Props) {
               style={[styles.btn, loading && styles.btnDisabled]}
               onPress={handleLogin}
               disabled={loading}
-              activeOpacity={0.85}
+              activeOpacity={0.88}
             >
               {loading ? (
                 <ActivityIndicator color={colors.background} />
               ) : (
-                <Text style={styles.btnText}>ورود</Text>
+                <Text style={styles.btnText}>ورود به داشبورد</Text>
               )}
             </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.link}>حساب ندارید؟ ثبت‌نام کنید</Text>
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.link}>حساب ندارید؟ ثبت‌نام دفتر املاک</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.hint}>
+            حالت دمو: هر ایمیل معتبر و رمز حداقل ۴ کاراکتر
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -115,31 +129,57 @@ export default function LoginScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.lg, flexGrow: 1 },
-  back: { marginBottom: spacing.lg },
-  backText: { color: colors.primary, fontSize: 15 },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'right',
-    marginBottom: spacing.sm,
+  bgGlow: {
+    position: 'absolute',
+    top: -40,
+    alignSelf: 'center',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: colors.primaryGlow,
+    opacity: 0.2,
   },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'right',
+  scroll: {
+    padding: spacing.lg,
+    flexGrow: 1,
+  },
+  back: { marginBottom: spacing.md },
+  backText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  header: {
+    alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  form: { gap: spacing.md },
+  title: {
+    marginTop: spacing.md,
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  subtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
   label: {
     color: colors.textSecondary,
     fontSize: 13,
     textAlign: 'right',
     marginBottom: -4,
+    fontWeight: '600',
   },
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 14,
@@ -155,13 +195,24 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     marginTop: spacing.sm,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: colors.background, fontSize: 16, fontWeight: '700' },
+  btnText: { color: colors.background, fontSize: 16, fontWeight: '800' },
   link: {
     color: colors.primary,
     textAlign: 'center',
-    marginTop: spacing.md,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  hint: {
+    marginTop: spacing.lg,
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: 12,
   },
 });
