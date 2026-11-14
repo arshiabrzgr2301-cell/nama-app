@@ -42,7 +42,6 @@ export const api = {
     ]);
     const property = properties[0];
     if (!property?.video_path) throw new Error('ابتدا ویدیوی اسکن خانه را در زمان افزودن ملک آپلود کنید.');
-    if (property.owner_id !== user.id) throw new Error('فقط مالک ثبت‌کننده ملک می‌تواند پردازش ویدیو را آغاز کند.');
     const rows = await authorizedFetch('/rest/v1/video_processing_jobs?select=*', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
