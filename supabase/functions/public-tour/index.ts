@@ -41,6 +41,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const property = properties[0];
+  await fetch(`${SUPABASE_URL}/rest/v1/properties?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ views: 0 }),
+  }).catch(() => undefined);
+
   const [hotspotResponse, signedResponse] = await Promise.all([
     fetch(
       `${SUPABASE_URL}/rest/v1/hotspots?select=id,yaw,pitch,title,description&property_id=eq.${id}&order=created_at.asc`,
