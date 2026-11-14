@@ -42,19 +42,24 @@ const VR_HTML = (imageUrl: string) => `
 
 export default function VRModeScreen({ navigation, route }: Props) {
   const { panoramaUrl } = route.params;
-  const demoPanorama = 'https://pannellum.org/images/alma.jpg';
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <WebView
-        originWhitelist={['*']}
-        source={{ html: VR_HTML(panoramaUrl || demoPanorama) }}
-        style={styles.webview}
-        javaScriptEnabled
-        domStorageEnabled
-        allowsInlineMediaPlayback
-      />
+      {panoramaUrl ? (
+        <WebView
+          originWhitelist={['*']}
+          source={{ html: VR_HTML(panoramaUrl) }}
+          style={styles.webview}
+          javaScriptEnabled
+          domStorageEnabled
+          allowsInlineMediaPlayback
+        />
+      ) : (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>تصویر پانورامای واقعی برای این ملک موجود نیست.</Text>
+        </View>
+      )}
       <TouchableOpacity style={styles.exit} onPress={() => navigation.goBack()}>
         <Text style={styles.exitText}>خروج از VR</Text>
       </TouchableOpacity>
@@ -65,6 +70,8 @@ export default function VRModeScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   webview: { flex: 1 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  emptyText: { color: '#fff', textAlign: 'center', fontSize: 15 },
   exit: {
     position: 'absolute',
     top: 48,
