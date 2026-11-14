@@ -165,13 +165,16 @@ export const api = {
     })) };
   },
   createProperty: async (data: PropertyPayload): Promise<Property> => {
+    if (data.status === 'published' && !data.panoramaUri) {
+      throw new Error('برای انتشار ملک، تصویر پانورامای ۳۶۰ را انتخاب کنید.');
+    }
     const user = await request<{ id: string }>('/auth/v1/user');
     const id = (await request<any[]>('/rest/v1/properties?select=id', {
       method: 'POST', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         owner_id: user.id, title: data.title, city: data.city, address: data.address,
         price: data.price, area: data.area, rooms: data.rooms, floor: data.floor,
-        description: data.description, status: data.status || 'draft',
+        description: data.description, status: 'draft',
       }),
     }))[0]?.id;
     if (!id) throw new Error('ساخت ملک در پایگاه داده ناموفق بود.');
@@ -181,6 +184,12 @@ export const api = {
     if (Object.keys(paths).length) {
       await request(`/rest/v1/properties?id=eq.${id}`, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(paths),
+      });
+    }
+    if (data.status === 'published') {
+      await request(`/rest/v1/properties?id=eq.${id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'published' }),
       });
     }
     return api.getProperty(id);
