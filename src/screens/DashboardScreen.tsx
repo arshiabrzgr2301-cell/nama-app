@@ -1,4 +1,4 @@
-import React, { useCallback, useState, memo } from 'react';
+import React, { useCallback, useState, memo, useMemo } from 'react';
 import {
   View,
   Text,
@@ -37,7 +37,9 @@ const PropertyCard = memo(function PropertyCard({ item, onPress, onTour }: CardP
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(item.id)}
-      activeOpacity={0.85}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={`ملک ${item.title}`}
     >
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle} numberOfLines={1}>
@@ -49,19 +51,32 @@ const PropertyCard = memo(function PropertyCard({ item, onPress, onTour }: CardP
             item.status === 'published' ? styles.badgePublished : styles.badgeDraft,
           ]}
         >
-          <Text style={styles.badgeText}>
+          <Text
+            style={[
+              styles.badgeText,
+              item.status === 'published' ? styles.badgeTextPublished : styles.badgeTextDraft,
+            ]}
+          >
             {item.status === 'published' ? 'منتشر شده' : 'پیش‌نویس'}
           </Text>
         </View>
       </View>
+
       <Text style={styles.cardMeta}>
         {item.city} · {item.area} متر · {item.rooms} خواب
       </Text>
       <Text style={styles.cardPrice}>{formatPrice(item.price)}</Text>
+
       <View style={styles.cardFooter}>
-        <Text style={styles.views}>👁 {item.views || 0} بازدید تور</Text>
-        <TouchableOpacity onPress={() => onTour(item.id, item.publicTourUrl)}>
-          <Text style={styles.tourLink}>مشاهده تور ←</Text>
+        <Text style={styles.views}>👁 {item.views || 0} بازدید</Text>
+        <TouchableOpacity
+          style={styles.tourBtn}
+          onPress={() => onTour(item.id, item.publicTourUrl)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="مشاهده تور ۳۶۰"
+        >
+          <Text style={styles.tourLink}>مشاهده تور</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -127,7 +142,7 @@ export default function DashboardScreen({ navigation }: Props) {
   }, [load]);
 
   const handleLogout = useCallback(() => {
-    Alert.alert('خروج', 'آیا مطمئن هستید؟', [
+    Alert.alert('خروج', 'آیا مطمئن هستید از حساب خارج شوید؟', [
       { text: 'انصراف', style: 'cancel' },
       {
         text: 'خروج',
@@ -151,6 +166,13 @@ export default function DashboardScreen({ navigation }: Props) {
     [navigation]
   );
 
+  const stats = useMemo(() => {
+    const published = properties.filter((p) => p.status === 'published').length;
+    const drafts = properties.length - published;
+    const views = properties.reduce((s, p) => s + (p.views || 0), 0);
+    return { published, drafts, views };
+  }, [properties]);
+
   const renderItem = useCallback(
     ({ item }: { item: Property }) => (
       <PropertyCard item={item} onPress={onCardPress} onTour={onTourPress} />
@@ -161,32 +183,63 @@ export default function DashboardScreen({ navigation }: Props) {
   const keyExtractor = useCallback((item: Property) => item.id, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>
+        <View style={styles.headerText}>
+          <Text style={styles.greeting} numberOfLines={1}>
             سلام، {user?.name || 'مشاور'}
           </Text>
-          <Text style={styles.office}>{user?.officeName || 'دفتر املاک'}</Text>
+          <Text style={styles.office} numberOfLines={1}>
+            {user?.officeName || 'دفتر املاک'}
+          </Text>
         </View>
-        <TouchableOpacity onPress={handleLogout}>
+        <TouchableOpacity
+          onPress={handleLogout}
+          style={styles.logoutBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="خروج از حساب"
+        >
           <Text style={styles.logout}>خروج</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* خلاصه سریع */}
+      <View style={styles.statsRow}>
+        <View style={styles.statChip}>
+          <Text style={styles.statValue}>{properties.length}</Text>
+          <Text style={styles.statLabel}>کل املاک</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={[styles.statValue, { color: colors.success }]}>{stats.published}</Text>
+          <Text style={styles.statLabel}>منتشر</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={[styles.statValue, { color: colors.warning }]}>{stats.drafts}</Text>
+          <Text style={styles.statLabel}>پیش‌نویس</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={[styles.statValue, { color: colors.primary }]}>{stats.views}</Text>
+          <Text style={styles.statLabel}>بازدید</Text>
+        </View>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => navigation.navigate('AddProperty')}
-          activeOpacity={0.85}
+          activeOpacity={0.88}
+          accessibilityRole="button"
         >
-          <Text style={styles.addBtnText}>+ افزودن ملک جدید</Text>
+          <Text style={styles.addBtnText}>+ افزودن ملک</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.guideBtn}
           onPress={() => navigation.navigate('ScanGuide')}
+          activeOpacity={0.88}
+          accessibilityRole="button"
         >
-          <Text style={styles.guideBtnText}>راهنمای اسکن</Text>
+          <Text style={styles.guideBtnText}>راهنما</Text>
         </TouchableOpacity>
       </View>
 
@@ -202,17 +255,29 @@ export default function DashboardScreen({ navigation }: Props) {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>هنوز ملکی ثبت نشده است.</Text>
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>هنوز ملکی ندارید</Text>
+            <Text style={styles.emptyDesc}>
+              اولین ملک را اضافه کنید و تور ۳۶۰ بسازید
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyBtn}
+              onPress={() => navigation.navigate('AddProperty')}
+            >
+              <Text style={styles.emptyBtnText}>افزودن اولین ملک</Text>
+            </TouchableOpacity>
+          </View>
         }
-        // بهینه‌سازی رندر لیست
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={7}
         removeClippedSubviews
         updateCellsBatchingPeriod={50}
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );
@@ -227,9 +292,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  headerText: { flex: 1, marginLeft: spacing.md },
   greeting: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.text,
     textAlign: 'right',
   },
@@ -237,8 +303,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'right',
+    marginTop: 2,
   },
-  logout: { color: colors.error, fontSize: 14 },
+  logoutBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  logout: { color: colors.error, fontSize: 14, fontWeight: '600' },
+  statsRow: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: spacing.lg,
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  statChip: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   actions: {
     flexDirection: 'row-reverse',
     gap: spacing.sm,
@@ -247,37 +346,40 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     flex: 1,
+    minHeight: 48,
     backgroundColor: colors.primary,
-    paddingVertical: 14,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  addBtnText: { color: colors.background, fontWeight: '700', fontSize: 15 },
+  addBtnText: { color: colors.background, fontWeight: '800', fontSize: 15 },
   guideBtn: {
-    paddingVertical: 14,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  guideBtnText: { color: colors.text, fontSize: 14 },
+  guideBtnText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textSecondary,
     textAlign: 'right',
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSoft,
   },
   cardHeader: {
     flexDirection: 'row-reverse',
@@ -293,14 +395,16 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
     marginLeft: 8,
   },
-  badgePublished: { backgroundColor: 'rgba(34,197,94,0.2)' },
-  badgeDraft: { backgroundColor: 'rgba(245,158,11,0.2)' },
-  badgeText: { fontSize: 11, fontWeight: '600', color: colors.text },
+  badgePublished: { backgroundColor: 'rgba(34,197,94,0.18)' },
+  badgeDraft: { backgroundColor: 'rgba(245,158,11,0.18)' },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  badgeTextPublished: { color: colors.success },
+  badgeTextDraft: { color: colors.warning },
   cardMeta: {
     fontSize: 13,
     color: colors.textSecondary,
@@ -309,10 +413,10 @@ const styles = StyleSheet.create({
   },
   cardPrice: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.primary,
     textAlign: 'right',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardFooter: {
     flexDirection: 'row-reverse',
@@ -320,11 +424,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   views: { fontSize: 12, color: colors.textMuted },
-  tourLink: { fontSize: 13, color: colors.primary, fontWeight: '600' },
-  empty: {
+  tourBtn: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primarySoft,
+    justifyContent: 'center',
+  },
+  tourLink: { fontSize: 13, color: colors.primary, fontWeight: '700' },
+  emptyBox: {
+    marginTop: 48,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    color: colors.textSecondary,
     textAlign: 'center',
-    color: colors.textMuted,
-    marginTop: 40,
+    marginBottom: spacing.lg,
+    lineHeight: 22,
+  },
+  emptyBtn: {
+    minHeight: 48,
+    paddingHorizontal: 24,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+  },
+  emptyBtnText: {
+    color: colors.background,
+    fontWeight: '800',
     fontSize: 15,
   },
 });
