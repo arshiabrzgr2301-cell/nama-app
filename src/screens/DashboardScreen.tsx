@@ -94,38 +94,9 @@ export default function DashboardScreen({ navigation }: Props) {
       setUser(u);
       const list = await api.getProperties();
       setProperties(list);
-    } catch {
-      setProperties([
-        {
-          id: 'demo-1',
-          title: 'آپارتمان ۳ خوابه سعادت‌آباد',
-          city: 'تهران',
-          address: 'سعادت‌آباد، خیابان سرو',
-          price: 18500000000,
-          area: 145,
-          rooms: 3,
-          floor: 5,
-          description: 'نورگیر عالی، بازسازی کامل',
-          status: 'published',
-          views: 42,
-          publicTourUrl: 'https://nama.ir/t/demo-1',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'demo-2',
-          title: 'ویلای دوبلکس لواسان',
-          city: 'لواسان',
-          address: 'لواسان، جاده اوشان',
-          price: 42000000000,
-          area: 320,
-          rooms: 4,
-          floor: 0,
-          description: 'استخر، روف‌گاردن',
-          status: 'draft',
-          views: 8,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+    } catch (error: any) {
+      setProperties([]);
+      Alert.alert('خطا در دریافت املاک', error?.message || 'ارتباط با سرور برقرار نشد.');
     }
   }, []);
 
