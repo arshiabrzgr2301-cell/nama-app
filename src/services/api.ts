@@ -62,11 +62,13 @@ async function refreshSession(): Promise<string | null> {
 }
 async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   let token = await getToken();
-  const headers = {
-    ...authHeaders(token || undefined),
-    ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.headers || {}),
-  };
+  const headers: Record<string, string> = { ...authHeaders(token || undefined) };
+  if (options.body && !(typeof FormData !== 'undefined' && options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (options.headers) {
+    new Headers(options.headers).forEach((value, key) => { headers[key] = value; });
+  }
   let res = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers });
   if (res.status === 401 && retry) {
     token = await refreshSession();
