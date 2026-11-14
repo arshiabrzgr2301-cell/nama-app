@@ -31,7 +31,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
       .catch((error: any) => {
         Alert.alert('خطا', error?.message || 'دریافت اطلاعات ملک ناموفق بود.');
         navigation.goBack();
-      });;
+      });
   }, [id]);
 
   if (!property) {
@@ -49,12 +49,18 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
 
   const shareTour = async () => {
     const url = property.publicTourUrl;
+    if (!url) {
+      Alert.alert('لینک در دسترس نیست', 'لینک عمومی تور هنوز ایجاد نشده است.');
+      return;
+    }
     try {
       await Share.share({
         message: `تور مجازی ملک «${property.title}» را ببینید:\n${url}`,
         url,
       });
-    } catch {}
+    } catch (error: any) {
+      Alert.alert('اشتراک‌گذاری ناموفق', error?.message || '');
+    }
   };
 
   const toggleStatus = async () => {
