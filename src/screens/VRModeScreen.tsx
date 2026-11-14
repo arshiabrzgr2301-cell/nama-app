@@ -61,7 +61,7 @@ export default function VRModeScreen({ navigation, route }: Props) {
         </View>
       )}
       <TouchableOpacity style={styles.exit} onPress={() => navigation.goBack()}>
-        <Text style={styles.exitText}>خروج از VR</Text>
+        <Text style={styles.exitText}>خروج از نمایش ۳۶۰</Text>
       </TouchableOpacity>
     </View>
   );
