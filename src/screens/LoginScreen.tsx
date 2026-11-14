@@ -30,7 +30,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   const handleLogin = async () => {
     if (!username.trim() || !password) {
-      Alert.alert('خطا', 'لطفاً ایمیل و رمز عبور را وارد کنید.');
+      Alert.alert('خطا', 'لطفاً نام کاربری و رمز عبور را وارد کنید.');
       return;
     }
     setLoading(true);
