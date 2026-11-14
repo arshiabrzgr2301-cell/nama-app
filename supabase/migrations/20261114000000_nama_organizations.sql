@@ -208,5 +208,70 @@ grant select on public.organizations, public.organization_subscriptions,
   public.profiles, public.organization_memberships to authenticated;
 grant update (full_name, phone) on public.profiles to authenticated;
 
+-- Organization members may read media belonging to any property in their organization.
+drop policy if exists "nama_org_media_read" on storage.objects;
+create policy "nama_org_media_read" on storage.objects
+for select to authenticated using (
+  bucket_id = 'property-media'
+  and (storage.foldername(name))[2] is not null
+  and (storage.foldername(name))[2] ~* '^[0-9a-f-]{36}
+  'One subscription per organization. Consultant count is intentionally unlimited; access is controlled by status and expiry.';
+
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and public.nama_is_active_member(p.organization_id)
+  )
+);
+
+drop policy if exists "nama_org_media_upload" on storage.objects;
+create policy "nama_org_media_upload" on storage.objects
+for insert to authenticated with check (
+  bucket_id = 'property-media'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and (storage.foldername(name))[2] is not null
+  and (storage.foldername(name))[2] ~* '^[0-9a-f-]{36}
+  'One subscription per organization. Consultant count is intentionally unlimited; access is controlled by status and expiry.';
+
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and public.nama_is_active_member(p.organization_id)
+  )
+);
+
+drop policy if exists "nama_org_media_update" on storage.objects;
+create policy "nama_org_media_update" on storage.objects
+for update to authenticated using (
+  bucket_id = 'property-media'
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and public.nama_is_active_member(p.organization_id)
+  )
+) with check (
+  bucket_id = 'property-media'
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and public.nama_is_active_member(p.organization_id)
+  )
+);
+
+drop policy if exists "nama_org_media_delete" on storage.objects;
+create policy "nama_org_media_delete" on storage.objects
+for delete to authenticated using (
+  bucket_id = 'property-media'
+  and exists (
+    select 1 from public.properties p
+    where p.id = ((storage.foldername(name))[2])::uuid
+      and p.owner_id = auth.uid()
+      and public.nama_is_active_member(p.organization_id)
+  )
+);
+
 comment on table public.organization_subscriptions is
   'One subscription per organization. Consultant count is intentionally unlimited; access is controlled by status and expiry.';
