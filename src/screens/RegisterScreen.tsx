@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
 import { api } from '../services/api';
-import { saveToken, saveUser } from '../utils/storage';
+import { saveToken, saveRefreshToken, saveUser } from '../utils/storage';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
@@ -45,6 +45,7 @@ export default function RegisterScreen({ navigation }: Props) {
         password,
       });
       await saveToken(res.token);
+      await saveRefreshToken(res.refreshToken);
       await saveUser(res.user);
       navigation.replace('Dashboard');
     } catch (e: any) {
