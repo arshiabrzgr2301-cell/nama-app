@@ -6,10 +6,22 @@ on:
       - main
   workflow_dispatch:
 
+# جلوگیری از اجرای همزمان چند build روی main
+concurrency:
+  group: nama-android-build
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build nama-debug.apk
-    runs-on: ubuntu-latest
+    # پین کردن نسخه برای جلوگیری از مهاجرت ناگهانی ubuntu-latest به Ubuntu 26
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    env:
+      # پایداری بیشتر Gradle در CI
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dkotlin.compiler.execution.strategy=in-process
+      CI: true
 
     steps:
       - name: Checkout repository
@@ -68,7 +80,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace --no-daemon
           echo "Gradle build finished"
 
       - name: Locate and rename APK
