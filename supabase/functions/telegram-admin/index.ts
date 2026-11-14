@@ -118,11 +118,20 @@ async function handle(chatId: number, text: string) {
         method: "PATCH", body: JSON.stringify({ status: "suspended" }),
       });
     }
-    return send(chatId, command === "/suspendorg" ? "کل سازمان و دسترسی اعضا تعلیق شد." : "وضعیت سازمان فعال شد؛ برای بازگشت دسترسی، اشتراک را نیز فعال/تمدید کنید.");
+    if (command === "/activateorg") {
+      await db("organization_subscriptions?organization_id=eq." + encodeURIComponent(args[0]), {
+        method: "PATCH", body: JSON.stringify({ status: "active" }),
+      });
+    }
+    return send(chatId, command === "/suspendorg" ? "کل سازمان و دسترسی اعضا تعلیق شد." : "سازمان فعال شد. اگر تاریخ اشتراک نگذشته باشد، دسترسی اعضا برمی‌گردد؛ در غیر این صورت تمدید لازم است.");
   }
   if (command === "/orgs") {
     const orgs = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&order=created_at.desc");
-    const lines = orgs.map((o: any) => `${o.name} | ${o.status} | ${o.id} | ${o.organization_subscriptions?.[0]?.status || "بدون اشتراک"} | ${o.organization_subscriptions?.[0]?.expires_at || "-"}`);
+    const lines = orgs.map((o: any) => {
+      const raw = o.organization_subscriptions;
+      const sub = Array.isArray(raw) ? raw[0] : raw;
+      return `${o.name} | ${o.status} | ${o.id} | ${sub?.status || "بدون اشتراک"} | ${sub?.expires_at || "-"}`;
+    });
     return send(chatId, lines.length ? lines.join("\n\n") : "سازمانی ثبت نشده است.");
   }
   return send(chatId, "دستور شناخته نشد. /help را بزنید.");
