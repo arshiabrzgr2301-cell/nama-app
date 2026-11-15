@@ -115,7 +115,7 @@ async function handle(chatId: number, text: string) {
     const orgs = await db("organizations?select=id,name&id=eq."+encodeURIComponent(orgId));
     if (!orgs.length) return send(chatId,"سازمان پیدا نشد.");
     const response = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      chat_id:chatId,text:"➕ افزودن مشاور به «"+orgs[0].name+"»\n\nمرحله ۱ از ۲: نام کاربری انگلیسی مشاور را بفرست.",
+      chat_id:chatId,text:"NAMA_ADD_USERNAME|"+orgId+"\n➕ افزودن مشاور به «"+orgs[0].name+"»\n\nمرحله ۱ از ۲: نام کاربری انگلیسی مشاور را بفرست.",
       reply_markup:{force_reply:true,selective:true}
     })});
     const result = await response.json();
@@ -321,26 +321,36 @@ Deno.serve(async (req) => {
     const chatId = message?.chat?.id;
     const fromId = String(update.message?.from?.id || update.callback_query?.from?.id || "");
     if (!chatId || !allowed.has(fromId) || message?.chat?.type !== "private") return new Response("ok");
-    if (update.message?.reply_to_message?.text?.startsWith("➕ افزودن مشاور به «")) {
-      const prompt = update.message.reply_to_message.text;
-      const orgMatch = prompt.match(/نام کاربری انگلیسی مشاور را بفرست\./);
-      const orgNameMatch = prompt.match(/«(.+?)»/);
-      if (orgMatch && orgNameMatch) {
-        const orgs = await db("organizations?select=id,name&name=eq."+encodeURIComponent(orgNameMatch[1]));
-        const org = orgs[0];
-        const username = String(update.message.text || "").trim().replace(/^@/,"");
-        if (!org) await send(chatId,"سازمان پیدا نشد. دوباره از فهرست سازمان‌ها انتخاب کن.");
-        else if (!/^[a-z0-9._-]{3,32}$/i.test(username)) await send(chatId,"نام کاربری معتبر نیست. فقط حروف انگلیسی، عدد، نقطه و خط تیره؛ دوباره تلاش کن.");
-        else {
-          const next = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-            chat_id:chatId,text:"مرحله ۲ از ۲: نام و نام خانوادگی مشاور را بفرست.\n(برای لغو /cancel را بفرست)",
-            reply_markup:{force_reply:true,selective:true}
-          })});
-          const data = await next.json();
-          if (!next.ok || !data.ok) throw new Error(data.description || "ارسال پیام ناموفق بود.");
-          await db("telegram_admin_pending", {method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({chat_id:chatId,org_id:org.id,username,step:"full_name",prompt_message_id:data.result.message_id})}).catch(()=>undefined);
-        }
+    const replyPrompt = String(update.message?.reply_to_message?.text || "");
+    if (replyPrompt.startsWith("NAMA_ADD_USERNAME|")) {
+      const [,orgId] = replyPrompt.split("|");
+      const username = String(update.message.text || "").trim().replace(/^@/,"").toLowerCase();
+      if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+        await send(chatId,"نام کاربری معتبر نیست؛ فقط حروف انگلیسی، عدد، نقطه و خط تیره (۳ تا ۳۲ کاراکتر). دوباره دکمه افزودن مشاور را بزن.");
+      } else {
+        const prompt = "NAMA_ADD_FULL|"+orgId+"|"+username;
+        const response = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          chat_id:chatId,text:"مرحله ۲ از ۲: نام و نام خانوادگی مشاور را بفرست.",reply_markup:{force_reply:true,selective:true}
+        })});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.description || "ارسال پیام ناموفق بود.");
+        await fetch(tg("editMessageText"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          chat_id:chatId,message_id:result.result.message_id,text:prompt+"\nمرحله ۲ از ۲: نام و نام خانوادگی مشاور را بفرست."
+        })});
       }
+      return new Response("ok");
+    }
+    if (replyPrompt.startsWith("NAMA_ADD_FULL|")) {
+      const [,orgId,username] = replyPrompt.split("|");
+      const fullName = String(update.message.text || "").trim();
+      if (!fullName || fullName.length > 100 || fullName.startsWith("/")) {
+        await send(chatId,"نام کامل معتبر نیست. دوباره از دکمه افزودن مشاور شروع کن.");
+      } else {
+        const result = await createUser(orgId,username,fullName,"consultant");
+        const orgs = await db("organizations?select=name&id=eq."+encodeURIComponent(orgId));
+        await send(chatId,"✅ مشاور با موفقیت اضافه شد.\n\nسازمان: "+(orgs[0]?.name || "—")+"\nنام: "+fullName+"\nنام کاربری: "+result.username+"\nرمز موقت: "+result.password+"\n\nرمز را فقط به خود مشاور بده.");
+      }
+      return new Response("ok");
     }
     if (update.callback_query?.id) {
       await fetch(tg("answerCallbackQuery"), {
