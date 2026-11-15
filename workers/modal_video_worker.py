@@ -4,7 +4,8 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-import modalimport requestsfrom transformers import AutoImageProcessor, AutoModelForDepthEstimation
+
+import modal
 
 APP_NAME = "nama-video-worker"
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
