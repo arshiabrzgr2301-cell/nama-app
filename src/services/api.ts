@@ -250,7 +250,57 @@ export interface TourScene {
   panoramaPath: string; panoramaUrl?: string; sortOrder: number; isEntry: boolean;
 }
 
+export interface TourLink {
+  id: string; propertyId: string; fromSceneId: string; toSceneId: string;
+  yaw: number; pitch: number; label: string;
+}
+
 export const guidedTourApi = {
+  listLinks: async (propertyId: string): Promise<TourLink[]> => {
+    const rows = await request<any[]>(
+      `/rest/v1/property_tour_links?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=created_at.asc`
+    );
+    return rows.map(row => ({
+      id: row.id, propertyId: row.property_id, fromSceneId: row.from_scene_id,
+      toSceneId: row.to_scene_id, yaw: Number(row.yaw), pitch: Number(row.pitch),
+      label: row.label || 'رفتن به بخش بعدی',
+    }));
+  },
+  addLink: async (propertyId: string, fromSceneId: string, toSceneId: string, yaw: number, pitch: number, label: string): Promise<TourLink> => {
+    if (fromSceneId === toSceneId) throw new Error('اتاق مبدأ و مقصد باید متفاوت باشند.');
+    if (!Number.isFinite(yaw) || !Number.isFinite(pitch) || yaw < -180 || yaw > 180 || pitch < -90 || pitch > 90) {
+      throw new Error('موقعیت انتخاب‌شده معتبر نیست.');
+    }
+    const user = await request<{id:string}>('/auth/v1/user');
+    const rows = await request<any[]>('/rest/v1/property_tour_links?select=*', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        property_id: propertyId, owner_id: user.id, from_scene_id: fromSceneId,
+        to_scene_id: toSceneId, yaw, pitch, label: label.trim() || 'رفتن به بخش بعدی',
+      }),
+    });
+    const row = rows[0];
+    if (!row?.id) throw new Error('ذخیره اتصال اتاق ناموفق بود.');
+    return {
+      id: row.id, propertyId: row.property_id, fromSceneId: row.from_scene_id,
+      toSceneId: row.to_scene_id, yaw: Number(row.yaw), pitch: Number(row.pitch),
+      label: row.label || 'رفتن به بخش بعدی',
+    };
+  },
+  deleteLink: async (linkId: string) => {
+    await request(`/rest/v1/property_tour_links?id=eq.${encodeURIComponent(linkId)}`, { method: 'DELETE' });
+  },
+  listScenes: async (propertyId: string): Promise<TourScene[]> => {
+    const rows = await request<any[]>(
+      `/rest/v1/property_tour_scenes?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc`
+    );
+    return Promise.all(rows.map(async row => ({
+      id: row.id, propertyId: row.property_id, title: row.title,
+      description: row.description || '', panoramaPath: row.panorama_path,
+      panoramaUrl: await signedMediaUrl(row.panorama_path),
+      sortOrder: row.sort_order, isEntry: row.is_entry,
+    })));
+  },
   listScenes: async (propertyId: string): Promise<TourScene[]> => {
     const rows = await request<any[]>(
       `/rest/v1/property_tour_scenes?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc`
@@ -304,9 +354,10 @@ export const guidedTourApi = {
     });
   },
   deleteScene: async (scene: TourScene) => {
-    await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(scene.id)}`, {method:'DELETE'});
     if (scene.panoramaPath !== 'pending') {
       await request(`/storage/v1/object/${MEDIA_BUCKET}/${scene.panoramaPath}`, {method:'DELETE'});
     }
+    await request(`/rest/v1/property_tour_links?property_id=eq.${encodeURIComponent(scene.propertyId)}&or=(from_scene_id.eq.${encodeURIComponent(scene.id)},to_scene_id.eq.${encodeURIComponent(scene.id)})`, {method:'DELETE'});
+    await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(scene.id)}&property_id=eq.${encodeURIComponent(scene.propertyId)}`, {method:'DELETE'});
   },
 };
