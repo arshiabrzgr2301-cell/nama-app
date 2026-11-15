@@ -6,6 +6,9 @@ const adminHeaders = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVIC
 
 const safeJson = (value: unknown) => JSON.stringify(value)
   .replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
+const safeHotspotText = (value: unknown) => String(value ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const textResponse = (message: string, status: number) => new Response(message, {
   status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store, max-age=0",
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" },
@@ -86,11 +89,11 @@ Deno.serve(async (req: Request) => {
     const tourData = validScenes.map((s: any) => ({
       id: s.id, title: s.title, description: s.description, image: s.image,
       hotspots: s.id === "main" ? hotspots.map((h: any) => ({
-        pitch: Number(h.pitch), yaw: Number(h.yaw), type: "info", text: String(h.title || ""),
-        ...(h.description ? { description: String(h.description) } : {}),
+        pitch: Number(h.pitch), yaw: Number(h.yaw), type: "info", text: safeHotspotText(h.title || ""),
+        ...(h.description ? { description: safeHotspotText(h.description) } : {}),
       })) : [],
       links: links.filter((link: any) => link.from_scene_id === s.id && validScenes.some((x: any) => x.id === link.to_scene_id))
-        .map((link: any) => ({ pitch: Number(link.pitch), yaw: Number(link.yaw), type: "scene", sceneId: link.to_scene_id, text: String(link.label || "رفتن به بخش بعدی") })),
+        .map((link: any) => ({ pitch: Number(link.pitch), yaw: Number(link.yaw), type: "scene", sceneId: link.to_scene_id, text: safeHotspotText(link.label || "رفتن به بخش بعدی") })),
     }));
     const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
