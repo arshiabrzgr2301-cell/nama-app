@@ -95,9 +95,9 @@ header{padding:12px 16px;background:#0d1a2d;border-bottom:1px solid #233a58}h1{f
 #rooms{display:flex;gap:8px;overflow-x:auto;padding:10px;background:#091426}#rooms button{white-space:nowrap;border:1px solid #233a58;border-radius:20px;padding:8px 13px;background:#0d1a2d;color:#cbd5e1}
 #rooms button.active{background:#27c8f4;color:#06111d;border-color:#27c8f4;font-weight:700}
 #panorama{height:calc(100% - 124px);width:100%;background:#000}#pause{position:fixed;bottom:16px;left:16px;border:1px solid #45617e;border-radius:22px;background:#0d1a2ddd;color:white;padding:9px 14px}
-</style></head><body><header><h1>${title}</h1><p>${city} · ${address}</p></header><nav id="rooms"></nav><div id="panorama"></div><button id="pause">توقف حرکت</button>
+</style></head><body><header><h1>${title}</h1><p>${city} · ${address}</p></header><nav id="rooms"></nav><div id="panorama"></div><button id="pause">شروع چرخش خودکار</button>
 <script>
-const scenes=${safeJson(tourData)};let viewer=null;let paused=false;
+const scenes=${safeJson(tourData)};let viewer=null;let autoRotating=false;
 function openScene(id){const scene=scenes.find(s=>s.id===id);if(!scene)return;if(viewer){viewer.destroy();viewer=null}
 document.querySelectorAll('#rooms button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
 const points=[...scene.hotspots,...scene.links.map(link=>({pitch:link.pitch,yaw:link.yaw,type:'info',text:link.text,clickHandlerFunc:()=>openScene(link.sceneId)}))];
@@ -105,7 +105,7 @@ viewer=pannellum.viewer('panorama',{type:'equirectangular',panorama:scene.image,
 }
 const nav=document.getElementById('rooms');
 scenes.forEach(scene=>{const b=document.createElement('button');b.textContent=scene.title;b.dataset.id=scene.id;b.onclick=()=>openScene(scene.id);nav.appendChild(b)});
-document.getElementById('pause').onclick=()=>{paused=!paused;document.getElementById('pause').textContent=paused?'ادامه نمایش':'توقف حرکت';if(viewer){if(paused)viewer.stopAutoRotate();else viewer.startAutoRotate(-2)}};
+document.getElementById('pause').onclick=()=>{autoRotating=!autoRotating;document.getElementById('pause').textContent=autoRotating?'توقف چرخش':'شروع چرخش خودکار';if(viewer){if(autoRotating)viewer.startAutoRotate(-2);else viewer.stopAutoRotate()}};
 openScene(${safeJson(entry.id)});
 </script></body></html>`;
 
