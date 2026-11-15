@@ -33,6 +33,10 @@ create index if not exists property_tour_scenes_property_order_idx
   on public.property_tour_scenes(property_id, sort_order, created_at);
 create index if not exists property_tour_links_from_scene_idx
   on public.property_tour_links(from_scene_id);
+create unique index if not exists property_tour_scenes_one_entry_idx
+  on public.property_tour_scenes(property_id) where is_entry;
+create unique index if not exists property_tour_links_unique_route_idx
+  on public.property_tour_links(from_scene_id, to_scene_id);
 
 alter table public.property_tour_scenes enable row level security;
 alter table public.property_tour_links enable row level security;
@@ -42,7 +46,7 @@ create policy "Owners manage property tour scenes"
 on public.property_tour_scenes for all to authenticated
 using (
   owner_id = auth.uid()
-  and exists (select 1 from public.properties p where p.id = property_id and p.owner_id = auth.uid())
+  and exists (select 1 from public.properties p where p.id = property_id and (p.owner_id = auth.uid() or exists (select 1 from public.organization_memberships m where m.organization_id = p.organization_id and m.user_id = auth.uid() and m.status = 'active')))
 )
 with check (
   owner_id = auth.uid()
@@ -68,7 +72,7 @@ with check (
   and exists (
     select 1 from public.properties p
     join public.property_tour_scenes s on s.property_id = p.id
-    where p.id = property_id and p.owner_id = auth.uid()
+    where p.id = property_id and (p.owner_id = auth.uid() or exists (select 1 from public.organization_memberships m where m.organization_id = p.organization_id and m.user_id = auth.uid() and m.status = 'active'))
       and s.id = from_scene_id
       and exists (
         select 1 from public.property_tour_scenes target_scene
@@ -118,4 +122,13 @@ using (
     join public.properties p on p.id = s.property_id
     where s.panorama_path = name and p.status = 'published'
   )
+);
+
+drop policy if exists "Owners delete tour scene panoramas" on storage.objects;
+create policy "Owners delete tour scene panoramas"
+on storage.objects for delete to authenticated
+using (
+  bucket_id = 'property-media'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and (storage.foldername(name))[3] = 'scenes'
 );
