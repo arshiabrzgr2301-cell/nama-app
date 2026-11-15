@@ -73,12 +73,12 @@ const PropertyCard = memo(function PropertyCard({ item, onPress, onTour }: CardP
         <Text style={styles.views}>👁 {item.views || 0} بازدید</Text>
         <TouchableOpacity
           style={styles.tourBtn}
-          onPress={() => onTour(item.id, item.publicTourUrl || item.panoramaUrl)}
+          onPress={() => (item.publicTourUrl || item.panoramaUrl) ? onTour(item.id, item.publicTourUrl || item.panoramaUrl) : onPress(item.id)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel="مشاهده تور ۳۶۰"
+          accessibilityLabel={(item.publicTourUrl || item.panoramaUrl) ? 'مشاهده تور ۳۶۰' : 'مدیریت تور ۳۶۰'}
         >
-          <Text style={styles.tourLink}>مشاهده تور</Text>
+          <Text style={styles.tourLink}>{(item.publicTourUrl || item.panoramaUrl) ? 'مشاهده تور' : 'مدیریت تور'}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
