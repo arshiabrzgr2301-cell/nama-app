@@ -25,8 +25,15 @@ using (
   )
 )
 with check (
-  panorama_path = 'pending'
-  or panorama_path like owner_id::text || '/' || property_id::text || '/scenes/%'
+  (
+    panorama_path = 'pending'
+    or panorama_path like owner_id::text || '/' || property_id::text || '/scenes/%'
+  )
+  and exists (
+    select 1 from public.properties p
+    where p.id = property_tour_scenes.property_id
+      and private.nama_is_active_member(p.organization_id)
+  )
 );
 
 drop policy if exists "Public read published tour scene panoramas" on storage.objects;
