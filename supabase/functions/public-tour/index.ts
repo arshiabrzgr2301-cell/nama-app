@@ -100,7 +100,7 @@ header{padding:12px 16px;background:#0d1a2d;border-bottom:1px solid #233a58}h1{f
 const scenes=${safeJson(tourData)};let viewer=null;let paused=false;
 function openScene(id){const scene=scenes.find(s=>s.id===id);if(!scene)return;if(viewer){viewer.destroy();viewer=null}
 document.querySelectorAll('#rooms button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
-const points=[...scene.hotspots,...scene.links.map(link=>({...link,clickHandlerFunc:()=>openScene(link.sceneId)}))];
+const points=[...scene.hotspots,...scene.links.map(link=>({pitch:link.pitch,yaw:link.yaw,type:'info',text:link.text,clickHandlerFunc:()=>openScene(link.sceneId)}))];
 viewer=pannellum.viewer('panorama',{type:'equirectangular',panorama:scene.image,autoLoad:true,showControls:true,compass:true,hotSpots:points});
 }
 const nav=document.getElementById('rooms');
