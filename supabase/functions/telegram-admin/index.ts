@@ -172,10 +172,39 @@ async function handle(chatId: number, text: string) {
     ].join("\n"));
   }
   if (command === "/neworg" && args.length === 0) return send(chatId, "➕ ساخت سازمان\nفرمت: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر");
-  if (command === "/adduser" && args.length === 0) return send(chatId, "👤 افزودن مشاور\nفرمت: /adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور\nشناسه سازمان را از بخش «سازمان‌ها» بردارید.");
-  if (command === "/renew" && args.length === 0) return send(chatId, "🔄 تمدید اشتراک\nفرمت: /renew شناسه_سازمان تعداد_روز");
-  if (command === "/suspend" && args.length === 0) return send(chatId, "⛔ تعلیق مشاور\nفرمت: /suspend نام_کاربری");
-  if (command === "/resetpass" && args.length === 0) return send(chatId, "🔑 بازیابی رمز\nفرمت: /resetpass نام_کاربری");
+  if (command === "/adduser" && args.length === 0) {
+    const orgs = await db("organizations?select=id,name,status&status=eq.active&order=name.asc");
+    const buttons = orgs.map((o:any)=>[{text:"🏢 "+o.name,callback_data:"/orgadd:"+o.id}]);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,"👤 ابتدا سازمان مقصد را انتخاب کن:",false,{inline_keyboard:buttons});
+  }
+  if (command === "/renew" && args.length === 0) {
+    const orgs = await db("organizations?select=id,name&order=name.asc");
+    const buttons = orgs.map((o:any)=>[{text:"🏢 "+o.name,callback_data:"/orgrenew:"+o.id}]);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,"🔄 سازمان موردنظر برای تمدید اشتراک را انتخاب کن:",false,{inline_keyboard:buttons});
+  }
+  if (command === "/suspend" && args.length === 0) {
+    const rows = await db("organization_memberships?select=user_id,organization_id,status,profiles(username,full_name),organizations(name)&status=eq.active&order=created_at.desc");
+    const buttons = rows.slice(0,40).map((m:any)=>{
+      const p=Array.isArray(m.profiles)?m.profiles[0]:m.profiles;
+      const o=Array.isArray(m.organizations)?m.organizations[0]:m.organizations;
+      return p?.username ? [{text:"⏸ "+(p.full_name||p.username)+" — "+(o?.name||"سازمان"),callback_data:"/membertoggle:"+m.organization_id+":"+p.username+":suspend"}] : null;
+    }).filter(Boolean);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,rows.length?"⛔ مشاور موردنظر را برای توقف دسترسی انتخاب کن:":"مشاور فعالی پیدا نشد.",false,{inline_keyboard:buttons});
+  }
+  if (command === "/resetpass" && args.length === 0) {
+    const rows = await db("organization_memberships?select=user_id,organization_id,status,profiles(username,full_name),organizations(name)&status=eq.active&order=created_at.desc");
+    const buttons = rows.slice(0,40).map((m:any)=>{
+      const p=Array.isArray(m.profiles)?m.profiles[0]:m.profiles;
+      const o=Array.isArray(m.organizations)?m.organizations[0]:m.organizations;
+      return p?.username ? [{text:"🔑 "+(p.full_name||p.username)+" — "+(o?.name||"سازمان"),callback_data:"/resetuser:"+p.username}] : null;
+    }).filter(Boolean);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,rows.length?"🔑 مشاور را برای بازیابی رمز انتخاب کن:":"مشاوری برای نمایش وجود ندارد.",false,{inline_keyboard:buttons});
+  }
+  if (command.startsWith("/resetuser:")) return handle(chatId,"/resetpass "+command.slice(11));
   if (command === "/neworg") {
     if (args.length < 3) return send(chatId, "فرمت: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر");
     const adminUsername = args[1];
