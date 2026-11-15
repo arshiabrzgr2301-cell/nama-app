@@ -253,7 +253,7 @@ export interface TourScene {
 export const guidedTourApi = {
   listScenes: async (propertyId: string): Promise<TourScene[]> => {
     const rows = await request<any[]>(
-      \`/rest/v1/property_tour_scenes?select=*&property_id=eq.\${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc\`
+      `/rest/v1/property_tour_scenes?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc`
     );
     return Promise.all(rows.map(async row => ({
       id: row.id, propertyId: row.property_id, title: row.title,
@@ -268,7 +268,7 @@ export const guidedTourApi = {
     if (!local.ok) throw new Error('خواندن تصویر انتخاب‌شده ناموفق بود.');
     const blob = await local.blob();
     const mime = blob.type || 'image/jpeg';
-    if (!/^image\\/(jpeg|png|webp)$/i.test(mime)) throw new Error('فرمت تصویر باید JPG، PNG یا WebP باشد.');
+    if (!/^image\/(jpeg|png|webp)$/i.test(mime)) throw new Error('فرمت تصویر باید JPG، PNG یا WebP باشد.');
     const ext = mime.split('/')[1].replace('jpeg','jpg');
     const rows = await request<any[]>('/rest/v1/property_tour_scenes?select=id', {
       method:'POST', headers:{Prefer:'return=representation'},
@@ -276,18 +276,18 @@ export const guidedTourApi = {
     });
     const sceneId = rows[0]?.id;
     if (!sceneId) throw new Error('ساخت صحنه تور ناموفق بود.');
-    const path = \`\${user.id}/\${propertyId}/scenes/\${sceneId}.\${ext}\`;
+    const path = `${user.id}/${propertyId}/scenes/${sceneId}.${ext}`;
     try {
       const token = await getToken();
-      const upload = await fetch(\`\${SUPABASE_URL}/storage/v1/object/\${MEDIA_BUCKET}/\${path}\`, {
+      const upload = await fetch(`${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
         method:'POST', headers:{...authHeaders(token || undefined),'Content-Type':mime,'x-upsert':'true'}, body:blob
       });
       if (!upload.ok) throw await parseError(upload);
-      await request(\`/rest/v1/property_tour_scenes?id=eq.\${sceneId}\`, {
+      await request(`/rest/v1/property_tour_scenes?id=eq.${sceneId}`, {
         method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({panorama_path:path})
       });
     } catch (error) {
-      await request(\`/rest/v1/property_tour_scenes?id=eq.\${sceneId}\`, {method:'DELETE'});
+      await request(`/rest/v1/property_tour_scenes?id=eq.${sceneId}`, {method:'DELETE'});
       throw error;
     }
     const scenes = await guidedTourApi.listScenes(propertyId);
@@ -296,17 +296,17 @@ export const guidedTourApi = {
     return scene;
   },
   setEntryScene: async (propertyId: string, sceneId: string) => {
-    await request(\`/rest/v1/property_tour_scenes?property_id=eq.\${encodeURIComponent(propertyId)}\`, {
+    await request(`/rest/v1/property_tour_scenes?property_id=eq.${encodeURIComponent(propertyId)}`, {
       method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({is_entry:false})
     });
-    await request(\`/rest/v1/property_tour_scenes?id=eq.\${encodeURIComponent(sceneId)}&property_id=eq.\${encodeURIComponent(propertyId)}\`, {
+    await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(sceneId)}&property_id=eq.${encodeURIComponent(propertyId)}`, {
       method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({is_entry:true})
     });
   },
   deleteScene: async (scene: TourScene) => {
-    await request(\`/rest/v1/property_tour_scenes?id=eq.\${encodeURIComponent(scene.id)}\`, {method:'DELETE'});
+    await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(scene.id)}`, {method:'DELETE'});
     if (scene.panoramaPath !== 'pending') {
-      await request(\`/storage/v1/object/\${MEDIA_BUCKET}/\${scene.panoramaPath}\`, {method:'DELETE'});
+      await request(`/storage/v1/object/${MEDIA_BUCKET}/${scene.panoramaPath}`, {method:'DELETE'});
     }
   },
 };
