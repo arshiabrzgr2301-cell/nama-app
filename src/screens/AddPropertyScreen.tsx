@@ -218,7 +218,7 @@ export default function AddPropertyScreen({ navigation }: Props) {
 
         <TouchableOpacity style={styles.uploadBtn} onPress={pickVideo}>
           <Text style={styles.uploadText}>
-            {videoUri ? '✓ ویدیو اسکن انتخاب شد' : '🎬 آپلود ویدیوی اسکن خانه'}
+            {videoUri ? '✓ ویدیوی معرفی انتخاب شد' : '🎬 آپلود ویدیوی معرفی ملک'}
           </Text>
         </TouchableOpacity>
 
