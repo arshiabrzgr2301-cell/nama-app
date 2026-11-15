@@ -33,6 +33,18 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
     try { await Share.share({ message: `تور مجازی ملک «${property.title}» را ببینید:\n${property.publicTourUrl}`, url: property.publicTourUrl }); }
     catch (error: any) { Alert.alert('اشتراک‌گذاری ناموفق', error?.message || ''); }
   };
+  const openTour = async () => {
+    if (property.publicTourUrl) {
+      try { await Linking.openURL(property.publicTourUrl); }
+      catch (error: any) { Alert.alert('باز کردن تور ناموفق', error?.message || ''); }
+      return;
+    }
+    if (property.panoramaUrl) {
+      navigation.navigate('TourViewer', { id: property.id, panoramaUrl: property.panoramaUrl });
+      return;
+    }
+    Alert.alert('تور آماده نیست', 'ابتدا در بخش «مدیریت تور هدایت‌شده ۳۶۰» تصاویر اتاق‌ها را اضافه کنید.');
+  };
   const openVideo = async () => {
     if (!property.videoUrl) return;
     try { await Linking.openURL(property.videoUrl); }
@@ -67,7 +79,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         <Text style={styles.desc}>{property.description || '—'}</Text>
         <Text style={styles.views}>👁 {property.views || 0} بازدید تور</Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('GuidedTourManager', { id: property.id, title: property.title })}><Text style={styles.primaryBtnText}>مدیریت تور هدایت‌شده ۳۶۰</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('TourViewer', { id: property.id, panoramaUrl: property.panoramaUrl })}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={openTour}>
           <Text style={styles.primaryBtnText}>مشاهده تور ۳۶۰</Text>
         </TouchableOpacity>
         {property.videoUrl ? <>
