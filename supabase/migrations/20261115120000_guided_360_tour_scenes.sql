@@ -69,7 +69,11 @@ with check (
     select 1 from public.properties p
     join public.property_tour_scenes s on s.property_id = p.id
     where p.id = property_id and p.owner_id = auth.uid()
-      and s.id in (from_scene_id, to_scene_id)
+      and s.id = from_scene_id
+      and exists (
+        select 1 from public.property_tour_scenes target_scene
+        where target_scene.id = to_scene_id and target_scene.property_id = p.id
+      )
   )
 );
 
