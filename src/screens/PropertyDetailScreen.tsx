@@ -79,11 +79,11 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         <Text style={styles.desc}>{property.description || '—'}</Text>
         <Text style={styles.views}>👁 {property.views || 0} بازدید تور</Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('GuidedTourManager', { id: property.id, title: property.title })}><Text style={styles.primaryBtnText}>مدیریت تور هدایت‌شده ۳۶۰</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.primaryBtn} onPress={openTour}>
+        {(property.publicTourUrl || property.panoramaUrl) ? <TouchableOpacity style={styles.primaryBtn} onPress={openTour}>
           <Text style={styles.primaryBtnText}>مشاهده تور ۳۶۰</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> : null}
         {property.videoUrl ? <TouchableOpacity style={styles.secondaryBtn} onPress={openVideo}><Text style={styles.secondaryBtnText}>مشاهده ویدیوی معرفی ملک</Text></TouchableOpacity> : null}
-        <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}><Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور ۳۶۰</Text></TouchableOpacity>
+        {property.publicTourUrl ? <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}><Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور ۳۶۰</Text></TouchableOpacity> : null}
         <TouchableOpacity style={styles.secondaryBtn} onPress={toggleStatus}>
           <Text style={styles.secondaryBtnText}>{property.status === 'published' ? 'تبدیل به پیش‌نویس' : 'انتشار ملک'}</Text>
         </TouchableOpacity>
