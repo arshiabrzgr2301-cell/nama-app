@@ -1,26 +1,38 @@
-# NAMA Guided 360 Tour (Option 3)
+# NAMA Guided 360 Tour — Release 1
 
-## Chosen product behavior
-The first release uses a guided 360-degree panorama tour, not free-roam 6DoF reconstruction. A viewer can look around from a fixed capture point, pause/inspect, choose a room, and follow hotspots to the next capture point.
+## Product decision
+Release 1 ships the guided 360-degree panorama experience. It does not claim free-roam 6DoF reconstruction or true stereoscopic depth.
 
-## Capture format
-- Capture one full equirectangular 360 panorama at each meaningful position (living room, kitchen, bedrooms, bathrooms, entrance).
-- Each scene is a separate image; a normal flat phone photo or ordinary video is not a substitute for a spherical panorama.
-- Scene links are directed navigation points placed at the doorway/transition direction.
-- The initial schema supports a designated entry scene and sort order for room navigation.
+## Consultant workflow
+1. Create a property as a draft.
+2. Open **مدیریت تور هدایت‌شده ۳۶۰**.
+3. Upload one full equirectangular panorama for each capture point / room.
+4. Choose the entry room.
+5. Select a source room and destination room.
+6. Tap the doorway / transition direction in the interactive 360 preview.
+7. Save the connection and repeat for each route.
+8. Publish the property and share its public tour link.
 
-## Data model
-- `property_tour_scenes`: one panorama and label per capture point.
-- `property_tour_links`: a yaw/pitch hotspot connecting one scene to another.
-- Existing `properties.panorama_path` and `hotspots` remain supported for backward compatibility with single-panorama tours.
+## Viewer behavior
+- Browse the room list directly.
+- Look around each fixed capture point in 360 degrees.
+- Follow saved directional hotspots to move between rooms.
+- Enable phone motion/orientation when supported.
+- Pause or resume optional auto-rotation.
+- Public tour is available only while the organization and subscription are active.
 
-## Storage path
-`{owner_id}/{property_id}/scenes/{scene_id}.jpg`
+## Capture requirements
+- Use one complete equirectangular 360 panorama at each meaningful location.
+- A normal flat photo or ordinary video is not a spherical panorama.
+- Supported image formats: JPG, PNG, WebP.
+- Keep the camera near the center of each room and capture doorways in the direction that will be linked.
 
-## Release sequence
-1. Apply the scene/link migration.
-2. Add a scene capture/upload manager in the consultant app.
-3. Extend the public tour page to load all scenes and navigate between them.
-4. Add VR headset presentation and verify orientation/comfort on target devices.
+## Backend and access
+- `property_tour_scenes`: panorama per capture point.
+- `property_tour_links`: directed room-to-room hotspot with yaw/pitch.
+- Active organization members can manage shared scenes and links.
+- Public access is limited to published properties with an active organization subscription.
+- Media remains in the private `property-media` bucket; the public tour creates short-lived signed image URLs.
 
-No GPU worker is required for this product path. It is image-based 360 navigation.
+## Deferred work
+GPU-based Gaussian Splatting / NeRF and AI-generated stereoscopic video remain future work. They are not part of the first commercial release until a real GPU worker, viewer, quality checks, and device testing are complete.
