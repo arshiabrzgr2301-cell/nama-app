@@ -10,9 +10,9 @@ import LogoMark from '../components/LogoMark';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
 const FEATURES = [
-  { icon: '⌂', label: 'تور فضایی ۳۶۰', tint: colors.primary },
-  { icon: '◇', label: 'بازسازی سه‌بعدی', tint: colors.secondary },
-  { icon: '✦', label: 'هوش مصنوعی', tint: colors.accent },
+  { icon: '⌂', label: 'تور هدایت‌شده ۳۶۰', tint: colors.primary },
+  { icon: '◇', label: 'اتصال اتاق‌به‌اتاق', tint: colors.secondary },
+  { icon: '✦', label: 'پنل سازمانی', tint: colors.accent },
 ];
 
 export default function HomeScreen({ navigation }: Props) {
