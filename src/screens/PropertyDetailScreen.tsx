@@ -82,12 +82,7 @@ export default function PropertyDetailScreen({ navigation, route }: Props) {
         <TouchableOpacity style={styles.primaryBtn} onPress={openTour}>
           <Text style={styles.primaryBtnText}>مشاهده تور ۳۶۰</Text>
         </TouchableOpacity>
-        {property.videoUrl ? <>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={openVideo}><Text style={styles.secondaryBtnText}>مشاهده ویدیوی اسکن خانه</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.processingBtn} onPress={() => navigation.navigate('VideoProcessing', { id: property.id })}>
-            <Text style={styles.processingText}>ساخت تور سه‌بعدی و ویدیوی VR از این ویدیو</Text>
-          </TouchableOpacity>
-        </> : null}
+        {property.videoUrl ? <TouchableOpacity style={styles.secondaryBtn} onPress={openVideo}><Text style={styles.secondaryBtnText}>مشاهده ویدیوی معرفی ملک</Text></TouchableOpacity> : null}
         <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}><Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور ۳۶۰</Text></TouchableOpacity>
         <TouchableOpacity style={styles.secondaryBtn} onPress={toggleStatus}>
           <Text style={styles.secondaryBtnText}>{property.status === 'published' ? 'تبدیل به پیش‌نویس' : 'انتشار ملک'}</Text>
@@ -117,6 +112,4 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: colors.background, fontWeight: '700', fontSize: 16 },
   secondaryBtn: { backgroundColor: colors.surface, paddingVertical: 14, borderRadius: borderRadius.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
   secondaryBtnText: { color: colors.text, fontWeight: '600', fontSize: 15 },
-  processingBtn: { backgroundColor: 'rgba(34,211,238,0.12)', paddingVertical: 15, borderRadius: borderRadius.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.primary, marginBottom: 10 },
-  processingText: { color: colors.primary, fontWeight: '800', fontSize: 14 },
 });
