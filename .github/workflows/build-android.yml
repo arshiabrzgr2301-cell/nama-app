@@ -61,29 +61,9 @@ jobs:
       - name: Verify Expo dependency alignment
         run: npx expo install --check
 
-      - name: Create placeholder assets
+      - name: Generate NAMA brand assets
         run: |
-          mkdir -p assets
-          python3 << 'PY'
-          import struct, zlib
-
-          def create_png(path, w, h, r, g, b):
-              def chunk(tag, data):
-                  return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
-              row = bytes([0]) + bytes([r, g, b, 255]) * w
-              raw = row * h
-              ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
-              data = chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw, 1)) + chunk(b'IEND', b'')
-              with open(path, 'wb') as f:
-                  f.write(b'\x89PNG\r\n\x1a\n' + data)
-              print(path, w, h, 'ok')
-
-          create_png('assets/icon.png', 512, 512, 34, 211, 238)
-          create_png('assets/splash.png', 512, 512, 15, 23, 42)
-          create_png('assets/adaptive-icon.png', 512, 512, 34, 211, 238)
-          create_png('assets/favicon.png', 48, 48, 34, 211, 238)
-          print('Placeholder assets created')
-          PY
+          python3 scripts/generate-brand-assets.py
           ls -lh assets/
 
       - name: Expo Doctor

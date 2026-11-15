@@ -112,7 +112,7 @@ function mapProperty(row: any, media: { panoramaUrl?: string; videoUrl?: string 
     floor: Number(row.floor || 0), description: row.description || '',
     status: row.status, views: Number(row.views || 0), createdAt: row.created_at,
     ...media,
-    publicTourUrl: row.status === 'published' && row.panorama_path ? `${PUBLIC_TOUR_ENDPOINT}?id=${row.id}` : undefined,
+    publicTourUrl: row.status === 'published' ? `${PUBLIC_TOUR_ENDPOINT}?id=${row.id}` : undefined,
   };
 }
 async function uploadLocalFile(uri: string, ownerId: string, propertyId: string, kind: 'panorama' | 'video'): Promise<string> {
@@ -215,8 +215,10 @@ export const api = {
     return api.getProperty(id);
   },
   publishProperty: async (id: string) => {
-    const property = await api.getProperty(id);
-    if (!property.panoramaUrl) throw new Error('برای انتشار تور، ابتدا تصویر پانورامای ۳۶۰ را آپلود کنید.');
+    const [property, scenes] = await Promise.all([api.getProperty(id), guidedTourApi.listScenes(id)]);
+    if (!property.panoramaUrl && scenes.length === 0) {
+      throw new Error('برای انتشار تور، حداقل یک پانورامای ۳۶۰ در بخش مدیریت تور اضافه کنید.');
+    }
     return api.updateProperty(id, { status: 'published' });
   },
   setDraft: async (id: string) => api.updateProperty(id, { status: 'draft' }),
@@ -230,16 +232,121 @@ export const api = {
     return { id: h.id, yaw: h.yaw, pitch: h.pitch, title: h.title, description: h.description || undefined };
   },
   incrementViews: async (id: string) => {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/properties?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: {
-        apikey: SUPABASE_KEY,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ views: 0 }),
+    await request('/rest/v1/rpc/increment_property_views', {
+      method: 'POST', body: JSON.stringify({ property_uuid: id }),
     });
-    if (!res.ok) throw await parseError(res);
     return { success: true };
+  },
+};
+
+
+export interface TourScene {
+  id: string; propertyId: string; title: string; description: string;
+  panoramaPath: string; panoramaUrl?: string; sortOrder: number; isEntry: boolean;
+}
+
+export interface TourLink {
+  id: string; propertyId: string; fromSceneId: string; toSceneId: string;
+  yaw: number; pitch: number; label: string;
+}
+
+export const guidedTourApi = {
+  listLinks: async (propertyId: string): Promise<TourLink[]> => {
+    const rows = await request<any[]>(
+      `/rest/v1/property_tour_links?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=created_at.asc`
+    );
+    return rows.map(row => ({
+      id: row.id, propertyId: row.property_id, fromSceneId: row.from_scene_id,
+      toSceneId: row.to_scene_id, yaw: Number(row.yaw), pitch: Number(row.pitch),
+      label: row.label || 'رفتن به بخش بعدی',
+    }));
+  },
+  addLink: async (propertyId: string, fromSceneId: string, toSceneId: string, yaw: number, pitch: number, label: string): Promise<TourLink> => {
+    if (fromSceneId === toSceneId) throw new Error('اتاق مبدأ و مقصد باید متفاوت باشند.');
+    if (!Number.isFinite(yaw) || !Number.isFinite(pitch) || yaw < -180 || yaw > 180 || pitch < -90 || pitch > 90) {
+      throw new Error('موقعیت انتخاب‌شده معتبر نیست.');
+    }
+    const user = await request<{id:string}>('/auth/v1/user');
+    const rows = await request<any[]>('/rest/v1/property_tour_links?select=*', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        property_id: propertyId, owner_id: user.id, from_scene_id: fromSceneId,
+        to_scene_id: toSceneId, yaw, pitch, label: label.trim() || 'رفتن به بخش بعدی',
+      }),
+    });
+    const row = rows[0];
+    if (!row?.id) throw new Error('ذخیره اتصال اتاق ناموفق بود.');
+    return {
+      id: row.id, propertyId: row.property_id, fromSceneId: row.from_scene_id,
+      toSceneId: row.to_scene_id, yaw: Number(row.yaw), pitch: Number(row.pitch),
+      label: row.label || 'رفتن به بخش بعدی',
+    };
+  },
+  deleteLink: async (linkId: string) => {
+    await request(`/rest/v1/property_tour_links?id=eq.${encodeURIComponent(linkId)}`, { method: 'DELETE' });
+  },
+
+  listScenes: async (propertyId: string): Promise<TourScene[]> => {
+    const rows = await request<any[]>(
+      `/rest/v1/property_tour_scenes?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc`
+    );
+    return Promise.all(rows.map(async row => ({
+      id: row.id, propertyId: row.property_id, title: row.title,
+      description: row.description || '', panoramaPath: row.panorama_path,
+      panoramaUrl: await signedMediaUrl(row.panorama_path),
+      sortOrder: row.sort_order, isEntry: row.is_entry,
+    })));
+  },
+  addScene: async (propertyId: string, title: string, uri: string, sortOrder: number, isEntry: boolean): Promise<TourScene> => {
+    const user = await request<{id:string}>('/auth/v1/user');
+    const local = await fetch(uri);
+    if (!local.ok) throw new Error('خواندن تصویر انتخاب‌شده ناموفق بود.');
+    const blob = await local.blob();
+    const mime = blob.type || 'image/jpeg';
+    if (!/^image\/(jpeg|png|webp)$/i.test(mime)) throw new Error('فرمت تصویر باید JPG، PNG یا WebP باشد.');
+    const ext = mime.split('/')[1].replace('jpeg','jpg');
+    const rows = await request<any[]>('/rest/v1/property_tour_scenes?select=id', {
+      method:'POST', headers:{Prefer:'return=representation'},
+      body:JSON.stringify({property_id:propertyId,owner_id:user.id,title:title.trim(),description:'',panorama_path:'pending',sort_order:sortOrder,is_entry:isEntry})
+    });
+    const sceneId = rows[0]?.id;
+    if (!sceneId) throw new Error('ساخت صحنه تور ناموفق بود.');
+    const path = `${user.id}/${propertyId}/scenes/${sceneId}.${ext}`;
+    try {
+      const token = await getToken();
+      const upload = await fetch(`${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
+        method:'POST', headers:{...authHeaders(token || undefined),'Content-Type':mime,'x-upsert':'true'}, body:blob
+      });
+      if (!upload.ok) throw await parseError(upload);
+      await request(`/rest/v1/property_tour_scenes?id=eq.${sceneId}`, {
+        method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({panorama_path:path})
+      });
+    } catch (error) {
+      await request(`/rest/v1/property_tour_scenes?id=eq.${sceneId}`, {method:'DELETE'});
+      throw error;
+    }
+    const scenes = await guidedTourApi.listScenes(propertyId);
+    const scene = scenes.find(item => item.id === sceneId);
+    if (!scene) throw new Error('صحنه ذخیره شد اما دریافت آن ناموفق بود.');
+    return scene;
+  },
+  setEntryScene: async (propertyId: string, sceneId: string) => {
+    await request(`/rest/v1/property_tour_scenes?property_id=eq.${encodeURIComponent(propertyId)}`, {
+      method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({is_entry:false})
+    });
+    await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(sceneId)}&property_id=eq.${encodeURIComponent(propertyId)}`, {
+      method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({is_entry:true})
+    });
+  },
+  deleteScene: async (scene: TourScene) => {
+    if (scene.panoramaPath !== 'pending') {
+      await request(`/storage/v1/object/${MEDIA_BUCKET}/${scene.panoramaPath}`, {method:'DELETE'});
+    }
+    await request(`/rest/v1/property_tour_links?property_id=eq.${encodeURIComponent(scene.propertyId)}&or=(from_scene_id.eq.${encodeURIComponent(scene.id)},to_scene_id.eq.${encodeURIComponent(scene.id)})`, {method:'DELETE'});
+    await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(scene.id)}&property_id=eq.${encodeURIComponent(scene.propertyId)}`, {method:'DELETE'});
+    const remaining = await guidedTourApi.listScenes(scene.propertyId);
+    if (remaining.length > 0 && !remaining.some(item => item.isEntry)) {
+      await guidedTourApi.setEntryScene(scene.propertyId, remaining[0].id);
+    }
   },
 };

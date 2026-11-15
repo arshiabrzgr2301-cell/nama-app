@@ -15,13 +15,13 @@ import AddPropertyScreen from '../screens/AddPropertyScreen';
 import PropertyDetailScreen from '../screens/PropertyDetailScreen';
 import TourViewerScreen from '../screens/TourViewerScreen';
 import VRModeScreen from '../screens/VRModeScreen';
+import VideoProcessingScreen from '../screens/VideoProcessingScreen';
 import ScanGuideScreen from '../screens/ScanGuideScreen';
+import GuidedTourManagerScreen from '../screens/GuidedTourManagerScreen';
 
-// بهینه‌سازی حافظه و رندر صفحه‌های غیر فعال
 enableScreens(true);
 enableFreeze(true);
 
-// فعال‌سازی RTL برای فارسی
 if (!I18nManager.isRTL) {
   I18nManager.allowRTL(true);
   I18nManager.forceRTL(true);
@@ -50,15 +50,10 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName={initialRoute}
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-          animation: 'slide_from_left',
-          freezeOnBlur: true,
-        }}
-      >
+      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{
+        headerShown: false, contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_left', freezeOnBlur: true,
+      }}>
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
@@ -66,7 +61,9 @@ export default function AppNavigator() {
         <Stack.Screen name="PropertyDetail" component={PropertyDetailScreen} />
         <Stack.Screen name="TourViewer" component={TourViewerScreen} />
         <Stack.Screen name="VRMode" component={VRModeScreen} options={{ presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="VideoProcessing" component={VideoProcessingScreen} />
         <Stack.Screen name="ScanGuide" component={ScanGuideScreen} />
+        <Stack.Screen name="GuidedTourManager" component={GuidedTourManagerScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -7,8 +7,28 @@ const allowed = new Set((Deno.env.get("TELEGRAM_ADMIN_IDS") || "").split(",").ma
 const tg = (method: string) => `https://api.telegram.org/bot${botToken}/${method}`;
 const dbHeaders = { apikey: service, Authorization: `Bearer ${service}`, "Content-Type": "application/json" };
 
-async function send(chatId: number, text: string) {
-  await fetch(tg("sendMessage"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text }) });
+const mainMenu = {
+  inline_keyboard: [
+    [{ text: "🏢 سازمان‌ها", callback_data: "/orgs" }, { text: "➕ سازمان جدید", callback_data: "/neworg" }],
+    [{ text: "👤 افزودن مشاور", callback_data: "/adduser" }, { text: "🔄 تمدید اشتراک", callback_data: "/renew" }],
+    [{ text: "⛔ مدیریت دسترسی", callback_data: "/suspend" }, { text: "🔑 بازیابی رمز", callback_data: "/resetpass" }],
+    [{ text: "📚 راهنما و دستورات", callback_data: "/help" }],
+  ],
+};
+
+async function send(chatId: number, text: string, withMenu = true, keyboard?: any) {
+  const response = await fetch(tg("sendMessage"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      ...(keyboard ? { reply_markup: keyboard } : withMenu ? { reply_markup: mainMenu } : {}),
+      disable_web_page_preview: true,
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.description || "ارسال پیام تلگرام ناموفق بود.");
 }
 async function db(path: string, init: RequestInit = {}) {
   const res = await fetch(`${url}/rest/v1/${path}`, { ...init, headers: { ...dbHeaders, ...(init.headers || {}) } });
@@ -45,21 +65,161 @@ async function createUser(orgId: string, username: string, fullName: string, rol
 async function handle(chatId: number, text: string) {
   const [commandRaw, ...args] = text.trim().split(/\s+/);
   const command = (commandRaw || "").split("@")[0].toLowerCase();
-  if (command === "/start" || command === "/help") {
+  if (command.startsWith("/org:")) {
+    const orgId = command.slice(5);
+    const rows = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&id=eq." + encodeURIComponent(orgId));
+    if (!rows.length) return send(chatId, "سازمان پیدا نشد.");
+    const o = rows[0];
+    const raw = o.organization_subscriptions;
+    const sub = Array.isArray(raw) ? raw[0] : raw;
+    const expiry = sub?.expires_at ? new Date(sub.expires_at) : null;
+    const remaining = expiry ? Math.ceil((expiry.getTime() - Date.now()) / 86400000) : null;
+    const members = await db("organization_memberships?select=status&organization_id=eq." + encodeURIComponent(orgId));
+    const active = members.filter((m: any) => m.status === "active").length;
+    const fa = new Intl.NumberFormat("fa-IR");
+    const date = expiry && !Number.isNaN(expiry.getTime())
+      ? expiry.toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", year: "numeric", month: "long", day: "numeric" })
+      : "ثبت نشده";
+    const subText = !sub ? "بدون اشتراک" : remaining !== null && remaining <= 0 ? "منقضی‌شده" : sub.status === "active" ? "فعال" : sub.status === "suspended" ? "تعلیق‌شده" : "در انتظار فعال‌سازی";
+    const keyboard = { inline_keyboard: [
+      [{text:"👥 مشاوران سازمان",callback_data:"/orgmembers:"+orgId}],
+      [{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId},{text:"🔄 تمدید اشتراک",callback_data:"/orgrenew:"+orgId}],
+      [{text:"⏸ توقف موقت سازمان",callback_data:"/orgconfirmstop:"+orgId}],
+      [{text:"▶️ فعال‌سازی سازمان",callback_data:"/orgactivate:"+orgId}],
+      [{text:"⬅️ بازگشت به سازمان‌ها",callback_data:"/orgs"},{text:"🏠 منوی اصلی",callback_data:"/menu"}]
+    ]};
+    return send(chatId, `🏢 ${o.name}\n\nوضعیت سازمان: ${o.status === "active" ? "فعال" : "تعلیق‌شده"}\nاشتراک: ${subText}\nتاریخ انقضا: ${date}\nباقی‌مانده: ${remaining === null ? "نامشخص" : remaining <= 0 ? "پایان‌یافته" : fa.format(remaining)+" روز"}\nمشاوران فعال: ${fa.format(active)} از ${fa.format(members.length)}\nظرفیت: نامحدود`, false, keyboard);
+  }
+  if (command.startsWith("/orgmembers:")) {
+    const orgId = command.slice(12);
+    const rows = await db("organization_memberships?select=user_id,role,status&organization_id=eq."+encodeURIComponent(orgId)+"&order=created_at.desc");
+    const userIds = rows.map((m:any)=>m.user_id).filter(Boolean);
+    const profiles = userIds.length ? await db("profiles?select=user_id,username,full_name&user_id=in.("+userIds.map(encodeURIComponent).join(",")+")") : [];
+    const profileById = new Map(profiles.map((p:any)=>[p.user_id,p]));
+    if (!rows.length) return send(chatId,"👥 هنوز مشاوری برای این سازمان ثبت نشده است.",false,{inline_keyboard:[[{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId}],[{text:"⬅️ بازگشت",callback_data:"/org:"+orgId}]]});
+    const lines = rows.slice(0,40).map((m:any,i:number)=> {
+      const p:any = profileById.get(m.user_id);
+      return `${i+1}. ${p?.full_name || p?.username || "مشاور"} (@${p?.username || "بدون نام کاربری"}) — ${m.status === "active" ? "فعال" : "متوقف"}`;
+    });
+    const buttons = rows.slice(0,40).map((m:any)=>{
+      const p:any = profileById.get(m.user_id);
+      if (!p?.username) return null;
+      return [{text:(m.status === "active" ? "⏸ " : "▶️ ")+(p.full_name || p.username),callback_data:"/membertoggle:"+orgId+":"+p.username+":"+(m.status === "active" ? "suspend" : "activate")}];
+    }).filter(Boolean);
+    buttons.push([{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId}]);
+    buttons.push([{text:"⬅️ بازگشت به سازمان",callback_data:"/org:"+orgId}]);
+    return send(chatId,"👥 فهرست مشاوران\n\n"+lines.join("\n"),false,{inline_keyboard:buttons});
+  }
+  if (command.startsWith("/orgadd:")) {
+    const orgId = command.slice(8);
+    const orgs = await db("organizations?select=id,name&id=eq."+encodeURIComponent(orgId));
+    if (!orgs.length) return send(chatId,"سازمان پیدا نشد.");
+    const response = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      chat_id:chatId,text:"NAMA_ADD_USERNAME|"+orgId+"\n➕ افزودن مشاور به «"+orgs[0].name+"»\n\nمرحله ۱ از ۲: نام کاربری انگلیسی مشاور را بفرست.",
+      reply_markup:{force_reply:true,selective:true}
+    })});
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.description || "ارسال پیام ناموفق بود.");
+    return;
+  }
+  if (command.startsWith("/orgrenew:")) {
+    const orgId = command.slice(10);
+    return send(chatId,"🔄 تمدید اشتراک\n\nمدت تمدید را انتخاب کن:",false,{inline_keyboard:[
+      [{text:"۳۰ روز",callback_data:"/reneworg:"+orgId+":30"},{text:"۹۰ روز",callback_data:"/reneworg:"+orgId+":90"}],
+      [{text:"۱۸۰ روز",callback_data:"/reneworg:"+orgId+":180"},{text:"۳۶۵ روز",callback_data:"/reneworg:"+orgId+":365"}],
+      [{text:"⬅️ بازگشت",callback_data:"/org:"+orgId}]
+    ]});
+  }
+  if (command.startsWith("/reneworg:")) {
+    const [,orgId,daysText] = command.split(":");
+    return handle(chatId,"/renew "+orgId+" "+daysText);
+  }
+  if (command.startsWith("/orgconfirmstop:")) {
+    const orgId = command.slice(16);
+    return send(chatId,"⚠️ با توقف موقت سازمان، دسترسی اعضای آن متوقف می‌شود. مطمئنی؟",false,{inline_keyboard:[
+      [{text:"⛔ بله، توقف دسترسی",callback_data:"/suspendorg:"+orgId}],
+      [{text:"لغو",callback_data:"/org:"+orgId}]
+    ]});
+  }
+  if (command.startsWith("/suspendorg:")) return handle(chatId,"/suspendorg "+command.slice(12));
+  if (command.startsWith("/orgactivate:")) {
+    const orgId = command.slice(13);
+    return send(chatId,"فعال‌سازی سازمان انجام شود؟",false,{inline_keyboard:[
+      [{text:"▶️ بله، فعال‌سازی",callback_data:"/activateorg:"+orgId}],
+      [{text:"لغو",callback_data:"/org:"+orgId}]
+    ]});
+  }
+  if (command.startsWith("/activateorg:")) return handle(chatId,"/activateorg "+command.slice(13));
+  if (command.startsWith("/membertoggle:")) {
+    const [,orgId,username,action] = command.split(":");
+    return send(chatId,action === "suspend" ? "دسترسی این مشاور موقتاً متوقف شود؟" : "دسترسی این مشاور دوباره فعال شود؟",false,{inline_keyboard:[
+      [{text:"تأیید",callback_data:"/"+action+" "+username}],
+      [{text:"لغو",callback_data:"/orgmembers:"+orgId}]
+    ]});
+  }
+  if (command === "/start" || command === "/menu") {
     return send(chatId, [
-      "ربات مدیریت NAMA",
-      "/neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر",
-      "/adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور",
-      "/renew شناسه_سازمان تعداد_روز",
-      "/suspend شناسه_کاربری",
-      "/activate شناسه_کاربری",
-      "/resetpass شناسه_کاربری",
-      "/suspendorg شناسه_سازمان",
-      "/activateorg شناسه_سازمان",
-      "/orgs",
-      "تعداد مشاوران هر سازمان نامحدود است.",
+      "🏙 NAMA | پنل مدیریت",
+      "",
+      "از منوی زیر عملیات موردنظر را انتخاب کنید.",
+      "اشتراک هر سازمان مستقل است و تعداد مشاوران نامحدود است.",
     ].join("\n"));
   }
+  if (command === "/help") {
+    return send(chatId, [
+      "📚 راهنمای مدیریت NAMA",
+      "",
+      "ساخت سازمان: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر",
+      "افزودن مشاور: /adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور",
+      "تمدید اشتراک: /renew شناسه_سازمان تعداد_روز",
+      "تعلیق مشاور: /suspend نام_کاربری",
+      "فعال‌سازی مشاور: /activate نام_کاربری",
+      "بازیابی رمز: /resetpass نام_کاربری",
+      "تعلیق سازمان: /suspendorg شناسه_سازمان",
+      "فعال‌سازی سازمان: /activateorg شناسه_سازمان",
+      "فهرست سازمان‌ها: /orgs",
+      "",
+      "ظرفیت مشاوران هر سازمان نامحدود است. برای بازگشت /menu را بزنید.",
+    ].join("\n"));
+  }
+  if (command === "/neworg" && args.length === 0) return send(chatId, "➕ ساخت سازمان\nفرمت: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر");
+  if (command === "/adduser" && args.length === 0) {
+    const orgs = await db("organizations?select=id,name,status&status=eq.active&order=name.asc");
+    const buttons = orgs.map((o:any)=>[{text:"🏢 "+o.name,callback_data:"/orgadd:"+o.id}]);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,"👤 ابتدا سازمان مقصد را انتخاب کن:",false,{inline_keyboard:buttons});
+  }
+  if (command === "/renew" && args.length === 0) {
+    const orgs = await db("organizations?select=id,name&order=name.asc");
+    const buttons = orgs.map((o:any)=>[{text:"🏢 "+o.name,callback_data:"/orgrenew:"+o.id}]);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,"🔄 سازمان موردنظر برای تمدید اشتراک را انتخاب کن:",false,{inline_keyboard:buttons});
+  }
+  if (command === "/suspend" && args.length === 0) {
+    const rows = await db("organization_memberships?select=user_id,organization_id,status&status=eq.active&order=created_at.desc");
+    const ids = [...new Set(rows.map((m:any)=>m.user_id).filter(Boolean))];
+    const profiles = ids.length ? await db("profiles?select=user_id,username,full_name&user_id=in.("+ids.map(encodeURIComponent).join(",")+")") : [];
+    const names = new Map(profiles.map((p:any)=>[p.user_id,p]));
+    const buttons = rows.slice(0,40).map((m:any)=>{
+      const p:any=names.get(m.user_id);
+      return p?.username ? [{text:"⏸ "+(p.full_name||p.username),callback_data:"/membertoggle:"+m.organization_id+":"+p.username+":suspend"}] : null;
+    }).filter(Boolean);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,rows.length?"⛔ مشاور موردنظر را برای توقف دسترسی انتخاب کن:":"مشاور فعالی پیدا نشد.",false,{inline_keyboard:buttons});
+  }
+  if (command === "/resetpass" && args.length === 0) {
+    const rows = await db("organization_memberships?select=user_id,organization_id,status&status=eq.active&order=created_at.desc");
+    const ids = [...new Set(rows.map((m:any)=>m.user_id).filter(Boolean))];
+    const profiles = ids.length ? await db("profiles?select=user_id,username,full_name&user_id=in.("+ids.map(encodeURIComponent).join(",")+")") : [];
+    const names = new Map(profiles.map((p:any)=>[p.user_id,p]));
+    const buttons = rows.slice(0,40).map((m:any)=>{
+      const p:any=names.get(m.user_id);
+      return p?.username ? [{text:"🔑 "+(p.full_name||p.username),callback_data:"/resetuser:"+p.username}] : null;
+    }).filter(Boolean);
+    buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,rows.length?"🔑 مشاور را برای بازیابی رمز انتخاب کن:":"مشاوری برای نمایش وجود ندارد.",false,{inline_keyboard:buttons});
+  }
+  if (command.startsWith("/resetuser:")) return handle(chatId,"/resetpass "+command.slice(11));
   if (command === "/neworg") {
     if (args.length < 3) return send(chatId, "فرمت: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر");
     const adminUsername = args[1];
@@ -143,12 +303,10 @@ async function handle(chatId: number, text: string) {
   }
   if (command === "/orgs") {
     const orgs = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&order=created_at.desc");
-    const lines = orgs.map((o: any) => {
-      const raw = o.organization_subscriptions;
-      const sub = Array.isArray(raw) ? raw[0] : raw;
-      return `${o.name} | ${o.status} | ${o.id} | ${sub?.status || "بدون اشتراک"} | ${sub?.expires_at || "-"}`;
-    });
-    return send(chatId, lines.length ? lines.join("\n\n") : "سازمانی ثبت نشده است.");
+    if (!orgs.length) return send(chatId,"🏢 هنوز سازمانی ثبت نشده است.");
+    const buttons = orgs.slice(0,40).map((o:any)=>[{text:"🏢 "+o.name,callback_data:"/org:"+o.id}]);
+    buttons.push([{text:"➕ ساخت سازمان جدید",callback_data:"/neworg"}],[{text:"🏠 منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,"🏢 سازمان‌ها\n\nبرای مشاهده جزئیات و مدیریت هر سازمان، نام آن را انتخاب کن.",false,{inline_keyboard:buttons});
   }
   return send(chatId, "دستور شناخته نشد. /help را بزنید.");
 }
@@ -159,13 +317,58 @@ Deno.serve(async (req) => {
   if (!expected || req.headers.get("x-telegram-bot-api-secret-token") !== expected) return new Response("forbidden", { status: 403 });
   try {
     const update = await req.json();
-    const message = update.message;
+    const message = update.message || update.callback_query?.message;
     const chatId = message?.chat?.id;
-    const fromId = String(message?.from?.id || "");
+    const fromId = String(update.message?.from?.id || update.callback_query?.from?.id || "");
     if (!chatId || !allowed.has(fromId) || message?.chat?.type !== "private") return new Response("ok");
-    await handle(chatId, String(message.text || ""));
+    const replyPrompt = String(update.message?.reply_to_message?.text || "");
+    if (replyPrompt.startsWith("NAMA_ADD_USERNAME|")) {
+      const [,orgId] = replyPrompt.split("|");
+      const username = String(update.message.text || "").trim().replace(/^@/,"").toLowerCase();
+      if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+        await send(chatId,"نام کاربری معتبر نیست؛ فقط حروف انگلیسی، عدد، نقطه و خط تیره (۳ تا ۳۲ کاراکتر). دوباره دکمه افزودن مشاور را بزن.");
+      } else {
+        const prompt = "NAMA_ADD_FULL|"+orgId+"|"+username;
+        const response = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          chat_id:chatId,text:"مرحله ۲ از ۲: نام و نام خانوادگی مشاور را بفرست.",reply_markup:{force_reply:true,selective:true}
+        })});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.description || "ارسال پیام ناموفق بود.");
+        await fetch(tg("editMessageText"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          chat_id:chatId,message_id:result.result.message_id,text:prompt+"\nمرحله ۲ از ۲: نام و نام خانوادگی مشاور را بفرست."
+        })});
+      }
+      return new Response("ok");
+    }
+    if (replyPrompt.startsWith("NAMA_ADD_FULL|")) {
+      const [,orgId,username] = replyPrompt.split("|");
+      const fullName = String(update.message.text || "").trim();
+      if (!fullName || fullName.length > 100 || fullName.startsWith("/")) {
+        await send(chatId,"نام کامل معتبر نیست. دوباره از دکمه افزودن مشاور شروع کن.");
+      } else {
+        const result = await createUser(orgId,username,fullName,"consultant");
+        const orgs = await db("organizations?select=name&id=eq."+encodeURIComponent(orgId));
+        await send(chatId,"✅ مشاور با موفقیت اضافه شد.\n\nسازمان: "+(orgs[0]?.name || "—")+"\nنام: "+fullName+"\nنام کاربری: "+result.username+"\nرمز موقت: "+result.password+"\n\nرمز را فقط به خود مشاور بده.");
+      }
+      return new Response("ok");
+    }
+    if (update.callback_query?.id) {
+      await fetch(tg("answerCallbackQuery"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callback_query_id: update.callback_query.id }),
+      });
+      await handle(chatId, String(update.callback_query.data || "/menu"));
+    } else {
+      await handle(chatId, String(update.message?.text || "/menu"));
+    }
   } catch (e) {
     console.error("telegram-admin error", e);
+    try {
+      const update = await req.clone().json();
+      const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
+      if (chatId) await send(chatId, "⚠️ عملیات انجام نشد. اطلاعات ورودی را بررسی کنید و دوباره تلاش کنید.\\n" + String((e as Error)?.message || "خطای نامشخص").slice(0, 240));
+    } catch { /* keep webhook response stable */ }
   }
   return new Response("ok");
 });

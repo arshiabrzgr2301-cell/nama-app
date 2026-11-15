@@ -7,12 +7,14 @@ import {
   FlatList,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
+import LogoMark from '../components/LogoMark';
 import { api, Property } from '../services/api';
 import { clearAuth, getUser } from '../utils/storage';
 
@@ -71,12 +73,12 @@ const PropertyCard = memo(function PropertyCard({ item, onPress, onTour }: CardP
         <Text style={styles.views}>👁 {item.views || 0} بازدید</Text>
         <TouchableOpacity
           style={styles.tourBtn}
-          onPress={() => onTour(item.id, item.panoramaUrl)}
+          onPress={() => (item.publicTourUrl || item.panoramaUrl) ? onTour(item.id, item.publicTourUrl || item.panoramaUrl) : onPress(item.id)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel="مشاهده تور ۳۶۰"
+          accessibilityLabel={(item.publicTourUrl || item.panoramaUrl) ? 'مشاهده تور ۳۶۰' : 'مدیریت تور ۳۶۰'}
         >
-          <Text style={styles.tourLink}>مشاهده تور</Text>
+          <Text style={styles.tourLink}>{(item.publicTourUrl || item.panoramaUrl) ? 'مشاهده تور' : 'مدیریت تور'}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -132,8 +134,13 @@ export default function DashboardScreen({ navigation }: Props) {
   );
 
   const onTourPress = useCallback(
-    (id: string, url?: string) =>
-      navigation.navigate('TourViewer', { id, panoramaUrl: url }),
+    (id: string, url?: string) => {
+      if (url?.includes('/functions/v1/public-tour')) {
+        Linking.openURL(url).catch(() => Alert.alert('خطا', 'باز کردن لینک تور ممکن نشد.'));
+        return;
+      }
+      navigation.navigate('TourViewer', { id, panoramaUrl: url });
+    },
     [navigation]
   );
 
@@ -155,6 +162,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View pointerEvents="none" style={styles.headerGlow} />
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.greeting} numberOfLines={1}>
@@ -164,6 +172,7 @@ export default function DashboardScreen({ navigation }: Props) {
             {user?.officeName || 'دفتر املاک'}
           </Text>
         </View>
+        <LogoMark size={38} />
         <TouchableOpacity
           onPress={handleLogout}
           style={styles.logoutBtn}
@@ -256,14 +265,17 @@ export default function DashboardScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  headerGlow: { position: 'absolute', top: -110, right: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: '#145B91', opacity: 0.16 },
   header: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
   },
-  headerText: { flex: 1, marginLeft: spacing.md },
+  headerText: { flex: 1, marginHorizontal: spacing.md },
   greeting: {
     fontSize: 20,
     fontWeight: '800',
@@ -293,11 +305,15 @@ const styles = StyleSheet.create({
   statChip: {
     flex: 1,
     backgroundColor: colors.surfaceElevated,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderSoft,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   statValue: {
     fontSize: 16,
