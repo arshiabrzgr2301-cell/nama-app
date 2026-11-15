@@ -4,13 +4,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-
-import cv2
-import modal
-import numpy as np
-import requests
-import torch
-from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+import modalimport requestsfrom transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
 APP_NAME = "nama-video-worker"
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
@@ -44,6 +38,7 @@ app = modal.App(APP_NAME)
 
 
 def control(action: str, **payload):
+    import requests
     response = requests.post(
         CONTROL_URL,
         json={"action": action, **payload},
@@ -55,6 +50,7 @@ def control(action: str, **payload):
 
 
 def storage_upload(local_path: Path, remote_path: str, content_type: str):
+    import requests
     url = f"{SUPABASE_URL}/storage/v1/object/{BUCKET}/{remote_path}"
     with local_path.open("rb") as stream:
         response = requests.post(
@@ -83,6 +79,11 @@ def run_command(command, cwd=None):
 
 
 def make_stereo(source: Path, output: Path, work: Path):
+    # These dependencies are installed in the remote Modal image, not on the GitHub runner.
+    import cv2
+    import numpy as np
+    import torch
+    from transformers import AutoImageProcessor, AutoModelForDepthEstimation
     model_id = "depth-anything/Depth-Anything-V2-Small-hf"
     processor = AutoImageProcessor.from_pretrained(model_id)
     model = AutoModelForDepthEstimation.from_pretrained(model_id).to("cuda").eval()
@@ -194,6 +195,7 @@ def make_spatial(source: Path, output_dir: Path, work: Path):
 @app.function(image=image, gpu="L4", timeout=7200, max_containers=1,
               secrets=[worker_secret])
 def process_video(job: dict, input_video_url: str):
+    import requests
     job_id = job.get("id", "")
     try:
         job_id = job["id"]
