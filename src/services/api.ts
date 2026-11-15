@@ -112,7 +112,7 @@ function mapProperty(row: any, media: { panoramaUrl?: string; videoUrl?: string 
     floor: Number(row.floor || 0), description: row.description || '',
     status: row.status, views: Number(row.views || 0), createdAt: row.created_at,
     ...media,
-    publicTourUrl: row.status === 'published' && row.panorama_path ? `${PUBLIC_TOUR_ENDPOINT}?id=${row.id}` : undefined,
+    publicTourUrl: row.status === 'published' ? `${PUBLIC_TOUR_ENDPOINT}?id=${row.id}` : undefined,
   };
 }
 async function uploadLocalFile(uri: string, ownerId: string, propertyId: string, kind: 'panorama' | 'video'): Promise<string> {
@@ -344,5 +344,9 @@ export const guidedTourApi = {
     }
     await request(`/rest/v1/property_tour_links?property_id=eq.${encodeURIComponent(scene.propertyId)}&or=(from_scene_id.eq.${encodeURIComponent(scene.id)},to_scene_id.eq.${encodeURIComponent(scene.id)})`, {method:'DELETE'});
     await request(`/rest/v1/property_tour_scenes?id=eq.${encodeURIComponent(scene.id)}&property_id=eq.${encodeURIComponent(scene.propertyId)}`, {method:'DELETE'});
+    const remaining = await guidedTourApi.listScenes(scene.propertyId);
+    if (remaining.length > 0 && !remaining.some(item => item.isEntry)) {
+      await guidedTourApi.setEntryScene(scene.propertyId, remaining[0].id);
+    }
   },
 };
