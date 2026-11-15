@@ -8,4 +8,5 @@ export type RootStackParamList = {
   VRMode: { id: string; panoramaUrl?: string };
   VideoProcessing: { id: string };
   ScanGuide: undefined;
+  GuidedTourManager: { id: string; title: string };
 };
