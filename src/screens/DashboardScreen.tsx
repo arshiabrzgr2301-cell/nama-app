@@ -7,6 +7,7 @@ import {
   FlatList,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -72,7 +73,7 @@ const PropertyCard = memo(function PropertyCard({ item, onPress, onTour }: CardP
         <Text style={styles.views}>👁 {item.views || 0} بازدید</Text>
         <TouchableOpacity
           style={styles.tourBtn}
-          onPress={() => onTour(item.id, item.panoramaUrl)}
+          onPress={() => onTour(item.id, item.publicTourUrl || item.panoramaUrl)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel="مشاهده تور ۳۶۰"
@@ -133,8 +134,13 @@ export default function DashboardScreen({ navigation }: Props) {
   );
 
   const onTourPress = useCallback(
-    (id: string, url?: string) =>
-      navigation.navigate('TourViewer', { id, panoramaUrl: url }),
+    (id: string, url?: string) => {
+      if (url?.includes('/functions/v1/public-tour')) {
+        Linking.openURL(url).catch(() => Alert.alert('خطا', 'باز کردن لینک تور ممکن نشد.'));
+        return;
+      }
+      navigation.navigate('TourViewer', { id, panoramaUrl: url });
+    },
     [navigation]
   );
 
