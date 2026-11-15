@@ -75,11 +75,11 @@ def render(size, transparent=False):
 
 def write_png(path, pixels):
     height, width = len(pixels), len(pixels[0])
-    raw = b"\\x00".join([]) if False else b"".join(b"\\x00" + bytes(channel for pixel in row for channel in pixel) for row in pixels)
+    raw = b"".join(b"\x00" + bytes(channel for pixel in row for channel in pixel) for row in pixels)
     def chunk(tag, data):
         return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
     header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
-    png = b"\\x89PNG\\r\\n\\x1a\\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
     with open(path, "wb") as output:
         output.write(png)
 
