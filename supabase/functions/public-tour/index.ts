@@ -71,6 +71,14 @@ Deno.serve(async (req: Request) => {
     }
     if (!validScenes.length) return textResponse("برای این ملک هنوز تصویر پانورامای معتبری ثبت نشده است.", 404);
 
+    // Count a view only after the tour, subscription and at least one panorama are valid.
+    const viewCountResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_property_views`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ property_uuid: id }),
+    });
+    if (!viewCountResponse.ok) console.error("NAMA view counter update failed:", viewCountResponse.status);
+
     const title = String(property.title || "تور مجازی ملک").replace(/[<>&"]/g, "");
     const city = String(property.city || "").replace(/[<>&"]/g, "");
     const address = String(property.address || "").replace(/[<>&"]/g, "");
