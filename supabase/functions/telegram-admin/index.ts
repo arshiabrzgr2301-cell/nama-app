@@ -178,12 +178,56 @@ async function handle(chatId: number, text: string) {
   }
   if (command === "/orgs") {
     const orgs = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&order=created_at.desc");
-    const lines = orgs.map((o: any) => {
+    if (!orgs.length) return send(chatId, "🏢 هنوز سازمانی ثبت نشده است.");
+
+    const ids = orgs.map((o: any) => o.id).filter(Boolean);
+    const memberships = ids.length
+      ? await db("organization_memberships?select=organization_id,status&organization_id=in.(" + ids.map(encodeURIComponent).join(",") + ")")
+      : [];
+    const activeCounts = new Map<string, number>();
+    const totalCounts = new Map<string, number>();
+    for (const member of memberships) {
+      totalCounts.set(member.organization_id, (totalCounts.get(member.organization_id) || 0) + 1);
+      if (member.status === "active") activeCounts.set(member.organization_id, (activeCounts.get(member.organization_id) || 0) + 1);
+    }
+
+    const now = Date.now();
+    const dateFormat = new Intl.DateTimeFormat("fa-IR", {
+      timeZone: "Asia/Tehran", year: "numeric", month: "long", day: "numeric",
+    });
+    const numberFormat = new Intl.NumberFormat("fa-IR");
+    const lines = orgs.map((o: any, index: number) => {
       const raw = o.organization_subscriptions;
       const sub = Array.isArray(raw) ? raw[0] : raw;
-      return `${o.name} | ${o.status} | ${o.id} | ${sub?.status || "بدون اشتراک"} | ${sub?.expires_at || "-"}`;
+      const expiry = sub?.expires_at ? new Date(sub.expires_at) : null;
+      const remaining = expiry ? Math.ceil((expiry.getTime() - now) / 86400000) : null;
+      const subscriptionStatus = !sub
+        ? "❌ بدون اشتراک"
+        : remaining !== null && remaining <= 0
+          ? "🔴 منقضی‌شده"
+          : sub.status === "active"
+            ? "🟢 فعال"
+            : sub.status === "pending"
+              ? "🟡 در انتظار فعال‌سازی"
+              : sub.status === "suspended"
+                ? "⛔ تعلیق‌شده"
+                : sub.status || "نامشخص";
+      const remainingText = remaining === null
+        ? "ثبت نشده"
+        : remaining <= 0
+          ? "پایان‌یافته"
+          : `${numberFormat.format(remaining)} روز`;
+      const orgStatus = o.status === "active" ? "فعال" : o.status === "suspended" ? "تعلیق‌شده" : o.status || "نامشخص";
+      return [
+        `${index + 1}) 🏢 ${o.name || "سازمان بدون نام"}`,
+        `وضعیت سازمان: ${orgStatus}`,
+        `اشتراک: ${subscriptionStatus}`,
+        `تاریخ انقضا: ${expiry && !Number.isNaN(expiry.getTime()) ? dateFormat.format(expiry) : "ثبت نشده"}`,
+        `باقی‌مانده: ${remainingText}`,
+        `مشاوران: ${numberFormat.format(activeCounts.get(o.id) || 0)} فعال از ${numberFormat.format(totalCounts.get(o.id) || 0)} نفر`,
+      ].join("\n");
     });
-    return send(chatId, lines.length ? lines.join("\n\n") : "سازمانی ثبت نشده است.");
+    return send(chatId, "📋 فهرست سازمان‌ها\n\n" + lines.join("\n\n") + "\n\n👥 ظرفیت مشاوران در هر سازمان: نامحدود");
   }
   return send(chatId, "دستور شناخته نشد. /help را بزنید.");
 }
