@@ -16,14 +16,14 @@ const mainMenu = {
   ],
 };
 
-async function send(chatId: number, text: string, withMenu = true) {
+async function send(chatId: number, text: string, withMenu = true, keyboard?: any) {
   const response = await fetch(tg("sendMessage"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
       text,
-      ...(withMenu ? { reply_markup: mainMenu } : {}),
+      ...(keyboard ? { reply_markup: keyboard } : withMenu ? { reply_markup: mainMenu } : {}),
       disable_web_page_preview: true,
     }),
   });
@@ -65,6 +65,87 @@ async function createUser(orgId: string, username: string, fullName: string, rol
 async function handle(chatId: number, text: string) {
   const [commandRaw, ...args] = text.trim().split(/\s+/);
   const command = (commandRaw || "").split("@")[0].toLowerCase();
+  if (command.startsWith("/org:")) {
+    const orgId = command.slice(5);
+    const rows = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&id=eq." + encodeURIComponent(orgId));
+    if (!rows.length) return send(chatId, "سازمان پیدا نشد.");
+    const o = rows[0];
+    const raw = o.organization_subscriptions;
+    const sub = Array.isArray(raw) ? raw[0] : raw;
+    const expiry = sub?.expires_at ? new Date(sub.expires_at) : null;
+    const remaining = expiry ? Math.ceil((expiry.getTime() - Date.now()) / 86400000) : null;
+    const members = await db("organization_memberships?select=status&organization_id=eq." + encodeURIComponent(orgId));
+    const active = members.filter((m: any) => m.status === "active").length;
+    const fa = new Intl.NumberFormat("fa-IR");
+    const date = expiry && !Number.isNaN(expiry.getTime())
+      ? expiry.toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", year: "numeric", month: "long", day: "numeric" })
+      : "ثبت نشده";
+    const subText = !sub ? "بدون اشتراک" : remaining !== null && remaining <= 0 ? "منقضی‌شده" : sub.status === "active" ? "فعال" : sub.status === "suspended" ? "تعلیق‌شده" : "در انتظار فعال‌سازی";
+    const keyboard = { inline_keyboard: [
+      [{text:"👥 مشاوران سازمان",callback_data:"/orgmembers:"+orgId}],
+      [{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId},{text:"🔄 تمدید اشتراک",callback_data:"/orgrenew:"+orgId}],
+      [{text:"⏸ توقف موقت سازمان",callback_data:"/orgconfirmstop:"+orgId}],
+      [{text:"▶️ فعال‌سازی سازمان",callback_data:"/orgactivate:"+orgId}],
+      [{text:"⬅️ بازگشت به سازمان‌ها",callback_data:"/orgs"},{text:"🏠 منوی اصلی",callback_data:"/menu"}]
+    ]};
+    return send(chatId, `🏢 ${o.name}\n\nوضعیت سازمان: ${o.status === "active" ? "فعال" : "تعلیق‌شده"}\nاشتراک: ${subText}\nتاریخ انقضا: ${date}\nباقی‌مانده: ${remaining === null ? "نامشخص" : remaining <= 0 ? "پایان‌یافته" : fa.format(remaining)+" روز"}\nمشاوران فعال: ${fa.format(active)} از ${fa.format(members.length)}\nظرفیت: نامحدود`, false, keyboard);
+  }
+  if (command.startsWith("/orgmembers:")) {
+    const orgId = command.slice(12);
+    const rows = await db("organization_memberships?select=user_id,role,status,profiles(username,full_name)&organization_id=eq."+encodeURIComponent(orgId)+"&order=created_at.desc");
+    if (!rows.length) return send(chatId,"👥 هنوز مشاوری برای این سازمان ثبت نشده است.",false,{inline_keyboard:[[{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId}],[{text:"⬅️ بازگشت",callback_data:"/org:"+orgId}]]});
+    const lines = rows.slice(0,40).map((m:any,i:number)=> {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      return `${i+1}. ${p?.full_name || p?.username || "مشاور"} (@${p?.username || "بدون نام کاربری"}) — ${m.status === "active" ? "فعال" : "متوقف"}`;
+    });
+    const buttons = rows.slice(0,40).map((m:any)=>{
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      if (!p?.username) return null;
+      return [{text:(m.status === "active" ? "⏸ " : "▶️ ")+(p.full_name || p.username),callback_data:"/membertoggle:"+orgId+":"+p.username+":"+(m.status === "active" ? "suspend" : "activate")}];
+    }).filter(Boolean);
+    buttons.push([{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId}]);
+    buttons.push([{text:"⬅️ بازگشت به سازمان",callback_data:"/org:"+orgId}]);
+    return send(chatId,"👥 فهرست مشاوران\n\n"+lines.join("\n"),false,{inline_keyboard:buttons});
+  }
+  if (command.startsWith("/orgadd:")) {
+    const orgId = command.slice(8);
+    return send(chatId,"➕ افزودن مشاور به سازمان\n\nاطلاعات را در یک پیام با این قالب بفرست:\n/adduser "+orgId+" نام_کاربری نام_کامل_مشاور",false);
+  }
+  if (command.startsWith("/orgrenew:")) {
+    const orgId = command.slice(10);
+    return send(chatId,"🔄 تمدید اشتراک\n\nمدت تمدید را انتخاب کن:",false,{inline_keyboard:[
+      [{text:"۳۰ روز",callback_data:"/reneworg:"+orgId+":30"},{text:"۹۰ روز",callback_data:"/reneworg:"+orgId+":90"}],
+      [{text:"۱۸۰ روز",callback_data:"/reneworg:"+orgId+":180"},{text:"۳۶۵ روز",callback_data:"/reneworg:"+orgId+":365"}],
+      [{text:"⬅️ بازگشت",callback_data:"/org:"+orgId}]
+    ]});
+  }
+  if (command.startsWith("/reneworg:")) {
+    const [,orgId,daysText] = command.split(":");
+    return handle(chatId,"/renew "+orgId+" "+daysText);
+  }
+  if (command.startsWith("/orgconfirmstop:")) {
+    const orgId = command.slice(16);
+    return send(chatId,"⚠️ با توقف موقت سازمان، دسترسی اعضای آن متوقف می‌شود. مطمئنی؟",false,{inline_keyboard:[
+      [{text:"⛔ بله، توقف دسترسی",callback_data:"/suspendorg:"+orgId}],
+      [{text:"لغو",callback_data:"/org:"+orgId}]
+    ]});
+  }
+  if (command.startsWith("/suspendorg:")) return handle(chatId,"/suspendorg "+command.slice(12));
+  if (command.startsWith("/orgactivate:")) {
+    const orgId = command.slice(13);
+    return send(chatId,"فعال‌سازی سازمان انجام شود؟",false,{inline_keyboard:[
+      [{text:"▶️ بله، فعال‌سازی",callback_data:"/activateorg:"+orgId}],
+      [{text:"لغو",callback_data:"/org:"+orgId}]
+    ]});
+  }
+  if (command.startsWith("/activateorg:")) return handle(chatId,"/activateorg "+command.slice(13));
+  if (command.startsWith("/membertoggle:")) {
+    const [,orgId,username,action] = command.split(":");
+    return send(chatId,action === "suspend" ? "دسترسی این مشاور موقتاً متوقف شود؟" : "دسترسی این مشاور دوباره فعال شود؟",false,{inline_keyboard:[
+      [{text:"تأیید",callback_data:"/"+action+" "+username}],
+      [{text:"لغو",callback_data:"/orgmembers:"+orgId}]
+    ]});
+  }
   if (command === "/start" || command === "/menu") {
     return send(chatId, [
       "🏙 NAMA | پنل مدیریت",
@@ -178,56 +259,10 @@ async function handle(chatId: number, text: string) {
   }
   if (command === "/orgs") {
     const orgs = await db("organizations?select=id,name,status,organization_subscriptions(status,expires_at)&order=created_at.desc");
-    if (!orgs.length) return send(chatId, "🏢 هنوز سازمانی ثبت نشده است.");
-
-    const ids = orgs.map((o: any) => o.id).filter(Boolean);
-    const memberships = ids.length
-      ? await db("organization_memberships?select=organization_id,status&organization_id=in.(" + ids.map(encodeURIComponent).join(",") + ")")
-      : [];
-    const activeCounts = new Map<string, number>();
-    const totalCounts = new Map<string, number>();
-    for (const member of memberships) {
-      totalCounts.set(member.organization_id, (totalCounts.get(member.organization_id) || 0) + 1);
-      if (member.status === "active") activeCounts.set(member.organization_id, (activeCounts.get(member.organization_id) || 0) + 1);
-    }
-
-    const now = Date.now();
-    const dateFormat = new Intl.DateTimeFormat("fa-IR", {
-      timeZone: "Asia/Tehran", year: "numeric", month: "long", day: "numeric",
-    });
-    const numberFormat = new Intl.NumberFormat("fa-IR");
-    const lines = orgs.map((o: any, index: number) => {
-      const raw = o.organization_subscriptions;
-      const sub = Array.isArray(raw) ? raw[0] : raw;
-      const expiry = sub?.expires_at ? new Date(sub.expires_at) : null;
-      const remaining = expiry ? Math.ceil((expiry.getTime() - now) / 86400000) : null;
-      const subscriptionStatus = !sub
-        ? "❌ بدون اشتراک"
-        : remaining !== null && remaining <= 0
-          ? "🔴 منقضی‌شده"
-          : sub.status === "active"
-            ? "🟢 فعال"
-            : sub.status === "pending"
-              ? "🟡 در انتظار فعال‌سازی"
-              : sub.status === "suspended"
-                ? "⛔ تعلیق‌شده"
-                : sub.status || "نامشخص";
-      const remainingText = remaining === null
-        ? "ثبت نشده"
-        : remaining <= 0
-          ? "پایان‌یافته"
-          : `${numberFormat.format(remaining)} روز`;
-      const orgStatus = o.status === "active" ? "فعال" : o.status === "suspended" ? "تعلیق‌شده" : o.status || "نامشخص";
-      return [
-        `${index + 1}) 🏢 ${o.name || "سازمان بدون نام"}`,
-        `وضعیت سازمان: ${orgStatus}`,
-        `اشتراک: ${subscriptionStatus}`,
-        `تاریخ انقضا: ${expiry && !Number.isNaN(expiry.getTime()) ? dateFormat.format(expiry) : "ثبت نشده"}`,
-        `باقی‌مانده: ${remainingText}`,
-        `مشاوران: ${numberFormat.format(activeCounts.get(o.id) || 0)} فعال از ${numberFormat.format(totalCounts.get(o.id) || 0)} نفر`,
-      ].join("\n");
-    });
-    return send(chatId, "📋 فهرست سازمان‌ها\n\n" + lines.join("\n\n") + "\n\n👥 ظرفیت مشاوران در هر سازمان: نامحدود");
+    if (!orgs.length) return send(chatId,"🏢 هنوز سازمانی ثبت نشده است.");
+    const buttons = orgs.slice(0,40).map((o:any)=>[{text:"🏢 "+o.name,callback_data:"/org:"+o.id}]);
+    buttons.push([{text:"➕ ساخت سازمان جدید",callback_data:"/neworg"}],[{text:"🏠 منوی اصلی",callback_data:"/menu"}]);
+    return send(chatId,"🏢 سازمان‌ها\n\nبرای مشاهده جزئیات و مدیریت هر سازمان، نام آن را انتخاب کن.",false,{inline_keyboard:buttons});
   }
   return send(chatId, "دستور شناخته نشد. /help را بزنید.");
 }
