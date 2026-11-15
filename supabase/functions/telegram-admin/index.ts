@@ -65,21 +65,36 @@ async function createUser(orgId: string, username: string, fullName: string, rol
 async function handle(chatId: number, text: string) {
   const [commandRaw, ...args] = text.trim().split(/\s+/);
   const command = (commandRaw || "").split("@")[0].toLowerCase();
-  if (command === "/start" || command === "/help") {
+  if (command === "/start" || command === "/menu") {
     return send(chatId, [
-      "ربات مدیریت NAMA",
-      "/neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر",
-      "/adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور",
-      "/renew شناسه_سازمان تعداد_روز",
-      "/suspend شناسه_کاربری",
-      "/activate شناسه_کاربری",
-      "/resetpass شناسه_کاربری",
-      "/suspendorg شناسه_سازمان",
-      "/activateorg شناسه_سازمان",
-      "/orgs",
-      "تعداد مشاوران هر سازمان نامحدود است.",
+      "🏙 NAMA | پنل مدیریت",
+      "",
+      "از منوی زیر عملیات موردنظر را انتخاب کنید.",
+      "اشتراک هر سازمان مستقل است و تعداد مشاوران نامحدود است.",
     ].join("\n"));
   }
+  if (command === "/help") {
+    return send(chatId, [
+      "📚 راهنمای مدیریت NAMA",
+      "",
+      "ساخت سازمان: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر",
+      "افزودن مشاور: /adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور",
+      "تمدید اشتراک: /renew شناسه_سازمان تعداد_روز",
+      "تعلیق مشاور: /suspend نام_کاربری",
+      "فعال‌سازی مشاور: /activate نام_کاربری",
+      "بازیابی رمز: /resetpass نام_کاربری",
+      "تعلیق سازمان: /suspendorg شناسه_سازمان",
+      "فعال‌سازی سازمان: /activateorg شناسه_سازمان",
+      "فهرست سازمان‌ها: /orgs",
+      "",
+      "ظرفیت مشاوران هر سازمان نامحدود است. برای بازگشت /menu را بزنید.",
+    ].join("\n"));
+  }
+  if (command === "/neworg" && args.length === 0) return send(chatId, "➕ ساخت سازمان\nفرمت: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر");
+  if (command === "/adduser" && args.length === 0) return send(chatId, "👤 افزودن مشاور\nفرمت: /adduser شناسه_سازمان نام_کاربری نام_کامل_مشاور\nشناسه سازمان را از بخش «سازمان‌ها» بردارید.");
+  if (command === "/renew" && args.length === 0) return send(chatId, "🔄 تمدید اشتراک\nفرمت: /renew شناسه_سازمان تعداد_روز");
+  if (command === "/suspend" && args.length === 0) return send(chatId, "⛔ تعلیق مشاور\nفرمت: /suspend نام_کاربری");
+  if (command === "/resetpass" && args.length === 0) return send(chatId, "🔑 بازیابی رمز\nفرمت: /resetpass نام_کاربری");
   if (command === "/neworg") {
     if (args.length < 3) return send(chatId, "فرمت: /neworg نام_سازمان نام_کاربری_مدیر نام_کامل_مدیر");
     const adminUsername = args[1];
