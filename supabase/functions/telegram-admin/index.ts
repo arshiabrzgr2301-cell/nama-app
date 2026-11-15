@@ -7,8 +7,28 @@ const allowed = new Set((Deno.env.get("TELEGRAM_ADMIN_IDS") || "").split(",").ma
 const tg = (method: string) => `https://api.telegram.org/bot${botToken}/${method}`;
 const dbHeaders = { apikey: service, Authorization: `Bearer ${service}`, "Content-Type": "application/json" };
 
-async function send(chatId: number, text: string) {
-  await fetch(tg("sendMessage"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text }) });
+const mainMenu = {
+  inline_keyboard: [
+    [{ text: "🏢 سازمان‌ها", callback_data: "/orgs" }, { text: "➕ سازمان جدید", callback_data: "/neworg" }],
+    [{ text: "👤 افزودن مشاور", callback_data: "/adduser" }, { text: "🔄 تمدید اشتراک", callback_data: "/renew" }],
+    [{ text: "⛔ مدیریت دسترسی", callback_data: "/suspend" }, { text: "🔑 بازیابی رمز", callback_data: "/resetpass" }],
+    [{ text: "📚 راهنما و دستورات", callback_data: "/help" }],
+  ],
+};
+
+async function send(chatId: number, text: string, withMenu = true) {
+  const response = await fetch(tg("sendMessage"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      ...(withMenu ? { reply_markup: mainMenu } : {}),
+      disable_web_page_preview: true,
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.description || "ارسال پیام تلگرام ناموفق بود.");
 }
 async function db(path: string, init: RequestInit = {}) {
   const res = await fetch(`${url}/rest/v1/${path}`, { ...init, headers: { ...dbHeaders, ...(init.headers || {}) } });
@@ -159,13 +179,27 @@ Deno.serve(async (req) => {
   if (!expected || req.headers.get("x-telegram-bot-api-secret-token") !== expected) return new Response("forbidden", { status: 403 });
   try {
     const update = await req.json();
-    const message = update.message;
+    const message = update.message || update.callback_query?.message;
     const chatId = message?.chat?.id;
-    const fromId = String(message?.from?.id || "");
+    const fromId = String(update.message?.from?.id || update.callback_query?.from?.id || "");
     if (!chatId || !allowed.has(fromId) || message?.chat?.type !== "private") return new Response("ok");
-    await handle(chatId, String(message.text || ""));
+    if (update.callback_query?.id) {
+      await fetch(tg("answerCallbackQuery"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callback_query_id: update.callback_query.id }),
+      });
+      await handle(chatId, String(update.callback_query.data || "/menu"));
+    } else {
+      await handle(chatId, String(update.message?.text || "/menu"));
+    }
   } catch (e) {
     console.error("telegram-admin error", e);
+    try {
+      const update = await req.clone().json();
+      const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
+      if (chatId) await send(chatId, "⚠️ عملیات انجام نشد. اطلاعات ورودی را بررسی کنید و دوباره تلاش کنید.\\n" + String((e as Error)?.message || "خطای نامشخص").slice(0, 240));
+    } catch { /* keep webhook response stable */ }
   }
   return new Response("ok");
 });
