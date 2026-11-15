@@ -14,7 +14,17 @@ const textResponse = (message: string, status: number) => new Response(message, 
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" },
 });
 
-async function signedImage(path: string): Promise<string | null> {
+function isSafePropertyMediaPath(path: string, propertyId: string, ownerId?: string): boolean {
+  const parts = path.split("/");
+  return parts.length >= 3
+    && !!parts[0]
+    && parts[1] === propertyId
+    && (!ownerId || parts[0] === ownerId)
+    && !parts.some(part => part === "." || part === "..");
+}
+
+async function signedImage(path: string, propertyId: string, ownerId?: string): Promise<string | null> {
+  if (!isSafePropertyMediaPath(path, propertyId, ownerId)) return null;
   const response = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/property-media/${path}`, {
     method: "POST", headers: { ...adminHeaders, "Content-Type": "application/json" },
     body: JSON.stringify({ expiresIn: 3600 }),
@@ -54,7 +64,7 @@ Deno.serve(async (req: Request) => {
     if (!active) return textResponse("اشتراک این دفتر فعال نیست.", 403);
 
     const [sceneRes, linkRes, hotspotRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/property_tour_scenes?select=id,title,description,panorama_path,sort_order,is_entry&property_id=eq.${id}&order=sort_order.asc,created_at.asc`, { headers: adminHeaders }),
+      fetch(`${SUPABASE_URL}/rest/v1/property_tour_scenes?select=id,owner_id,title,description,panorama_path,sort_order,is_entry&property_id=eq.${id}&order=sort_order.asc,created_at.asc`, { headers: adminHeaders }),
       fetch(`${SUPABASE_URL}/rest/v1/property_tour_links?select=id,from_scene_id,to_scene_id,yaw,pitch,label&property_id=eq.${id}`, { headers: adminHeaders }),
       fetch(`${SUPABASE_URL}/rest/v1/hotspots?select=id,yaw,pitch,title,description&property_id=eq.${id}&order=created_at.asc`, { headers: adminHeaders }),
     ]);
@@ -65,11 +75,11 @@ Deno.serve(async (req: Request) => {
     const scenes = await Promise.all(rawScenes.map(async (scene: any) => ({
       id: scene.id, title: String(scene.title || "بخش تور"), description: String(scene.description || ""),
       isEntry: !!scene.is_entry, sortOrder: Number(scene.sort_order || 0),
-      image: await signedImage(scene.panorama_path),
+      image: await signedImage(scene.panorama_path, id, scene.owner_id),
     })));
     const validScenes = scenes.filter((scene: any) => scene.image);
     if (!validScenes.length && property.panorama_path) {
-      const legacy = await signedImage(property.panorama_path);
+      const legacy = await signedImage(property.panorama_path, id);
       if (legacy) validScenes.push({ id: "main", title: "نمای اصلی", description: "", isEntry: true, sortOrder: 0, image: legacy });
     }
     if (!validScenes.length) return textResponse("برای این ملک هنوز تصویر پانورامای معتبری ثبت نشده است.", 404);
