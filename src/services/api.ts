@@ -290,17 +290,7 @@ export const guidedTourApi = {
   deleteLink: async (linkId: string) => {
     await request(`/rest/v1/property_tour_links?id=eq.${encodeURIComponent(linkId)}`, { method: 'DELETE' });
   },
-  listScenes: async (propertyId: string): Promise<TourScene[]> => {
-    const rows = await request<any[]>(
-      `/rest/v1/property_tour_scenes?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc`
-    );
-    return Promise.all(rows.map(async row => ({
-      id: row.id, propertyId: row.property_id, title: row.title,
-      description: row.description || '', panoramaPath: row.panorama_path,
-      panoramaUrl: await signedMediaUrl(row.panorama_path),
-      sortOrder: row.sort_order, isEntry: row.is_entry,
-    })));
-  },
+
   listScenes: async (propertyId: string): Promise<TourScene[]> => {
     const rows = await request<any[]>(
       `/rest/v1/property_tour_scenes?select=*&property_id=eq.${encodeURIComponent(propertyId)}&order=sort_order.asc,created_at.asc`
