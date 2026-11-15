@@ -215,8 +215,10 @@ export const api = {
     return api.getProperty(id);
   },
   publishProperty: async (id: string) => {
-    const property = await api.getProperty(id);
-    if (!property.panoramaUrl) throw new Error('برای انتشار تور، ابتدا تصویر پانورامای ۳۶۰ را آپلود کنید.');
+    const [property, scenes] = await Promise.all([api.getProperty(id), guidedTourApi.listScenes(id)]);
+    if (!property.panoramaUrl && scenes.length === 0) {
+      throw new Error('برای انتشار تور، حداقل یک پانورامای ۳۶۰ در بخش مدیریت تور اضافه کنید.');
+    }
     return api.updateProperty(id, { status: 'published' });
   },
   setDraft: async (id: string) => api.updateProperty(id, { status: 'draft' }),
@@ -230,16 +232,9 @@ export const api = {
     return { id: h.id, yaw: h.yaw, pitch: h.pitch, title: h.title, description: h.description || undefined };
   },
   incrementViews: async (id: string) => {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/properties?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: {
-        apikey: SUPABASE_KEY,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ views: 0 }),
+    await request('/rest/v1/rpc/increment_property_views', {
+      method: 'POST', body: JSON.stringify({ property_uuid: id }),
     });
-    if (!res.ok) throw await parseError(res);
     return { success: true };
   },
 };
