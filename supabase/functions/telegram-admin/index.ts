@@ -92,14 +92,17 @@ async function handle(chatId: number, text: string) {
   }
   if (command.startsWith("/orgmembers:")) {
     const orgId = command.slice(12);
-    const rows = await db("organization_memberships?select=user_id,role,status,profiles(username,full_name)&organization_id=eq."+encodeURIComponent(orgId)+"&order=created_at.desc");
+    const rows = await db("organization_memberships?select=user_id,role,status&organization_id=eq."+encodeURIComponent(orgId)+"&order=created_at.desc");
+    const userIds = rows.map((m:any)=>m.user_id).filter(Boolean);
+    const profiles = userIds.length ? await db("profiles?select=user_id,username,full_name&user_id=in.("+userIds.map(encodeURIComponent).join(",")+")") : [];
+    const profileById = new Map(profiles.map((p:any)=>[p.user_id,p]));
     if (!rows.length) return send(chatId,"👥 هنوز مشاوری برای این سازمان ثبت نشده است.",false,{inline_keyboard:[[{text:"➕ افزودن مشاور",callback_data:"/orgadd:"+orgId}],[{text:"⬅️ بازگشت",callback_data:"/org:"+orgId}]]});
     const lines = rows.slice(0,40).map((m:any,i:number)=> {
-      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      const p:any = profileById.get(m.user_id);
       return `${i+1}. ${p?.full_name || p?.username || "مشاور"} (@${p?.username || "بدون نام کاربری"}) — ${m.status === "active" ? "فعال" : "متوقف"}`;
     });
     const buttons = rows.slice(0,40).map((m:any)=>{
-      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      const p:any = profileById.get(m.user_id);
       if (!p?.username) return null;
       return [{text:(m.status === "active" ? "⏸ " : "▶️ ")+(p.full_name || p.username),callback_data:"/membertoggle:"+orgId+":"+p.username+":"+(m.status === "active" ? "suspend" : "activate")}];
     }).filter(Boolean);
@@ -109,7 +112,15 @@ async function handle(chatId: number, text: string) {
   }
   if (command.startsWith("/orgadd:")) {
     const orgId = command.slice(8);
-    return send(chatId,"➕ افزودن مشاور به سازمان\n\nاطلاعات را در یک پیام با این قالب بفرست:\n/adduser "+orgId+" نام_کاربری نام_کامل_مشاور",false);
+    const orgs = await db("organizations?select=id,name&id=eq."+encodeURIComponent(orgId));
+    if (!orgs.length) return send(chatId,"سازمان پیدا نشد.");
+    const response = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      chat_id:chatId,text:"➕ افزودن مشاور به «"+orgs[0].name+"»\n\nمرحله ۱ از ۲: نام کاربری انگلیسی مشاور را بفرست.",
+      reply_markup:{force_reply:true,selective:true}
+    })});
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.description || "ارسال پیام ناموفق بود.");
+    return;
   }
   if (command.startsWith("/orgrenew:")) {
     const orgId = command.slice(10);
@@ -185,21 +196,25 @@ async function handle(chatId: number, text: string) {
     return send(chatId,"🔄 سازمان موردنظر برای تمدید اشتراک را انتخاب کن:",false,{inline_keyboard:buttons});
   }
   if (command === "/suspend" && args.length === 0) {
-    const rows = await db("organization_memberships?select=user_id,organization_id,status,profiles(username,full_name),organizations(name)&status=eq.active&order=created_at.desc");
+    const rows = await db("organization_memberships?select=user_id,organization_id,status&status=eq.active&order=created_at.desc");
+    const ids = [...new Set(rows.map((m:any)=>m.user_id).filter(Boolean))];
+    const profiles = ids.length ? await db("profiles?select=user_id,username,full_name&user_id=in.("+ids.map(encodeURIComponent).join(",")+")") : [];
+    const names = new Map(profiles.map((p:any)=>[p.user_id,p]));
     const buttons = rows.slice(0,40).map((m:any)=>{
-      const p=Array.isArray(m.profiles)?m.profiles[0]:m.profiles;
-      const o=Array.isArray(m.organizations)?m.organizations[0]:m.organizations;
-      return p?.username ? [{text:"⏸ "+(p.full_name||p.username)+" — "+(o?.name||"سازمان"),callback_data:"/membertoggle:"+m.organization_id+":"+p.username+":suspend"}] : null;
+      const p:any=names.get(m.user_id);
+      return p?.username ? [{text:"⏸ "+(p.full_name||p.username),callback_data:"/membertoggle:"+m.organization_id+":"+p.username+":suspend"}] : null;
     }).filter(Boolean);
     buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
     return send(chatId,rows.length?"⛔ مشاور موردنظر را برای توقف دسترسی انتخاب کن:":"مشاور فعالی پیدا نشد.",false,{inline_keyboard:buttons});
   }
   if (command === "/resetpass" && args.length === 0) {
-    const rows = await db("organization_memberships?select=user_id,organization_id,status,profiles(username,full_name),organizations(name)&status=eq.active&order=created_at.desc");
+    const rows = await db("organization_memberships?select=user_id,organization_id,status&status=eq.active&order=created_at.desc");
+    const ids = [...new Set(rows.map((m:any)=>m.user_id).filter(Boolean))];
+    const profiles = ids.length ? await db("profiles?select=user_id,username,full_name&user_id=in.("+ids.map(encodeURIComponent).join(",")+")") : [];
+    const names = new Map(profiles.map((p:any)=>[p.user_id,p]));
     const buttons = rows.slice(0,40).map((m:any)=>{
-      const p=Array.isArray(m.profiles)?m.profiles[0]:m.profiles;
-      const o=Array.isArray(m.organizations)?m.organizations[0]:m.organizations;
-      return p?.username ? [{text:"🔑 "+(p.full_name||p.username)+" — "+(o?.name||"سازمان"),callback_data:"/resetuser:"+p.username}] : null;
+      const p:any=names.get(m.user_id);
+      return p?.username ? [{text:"🔑 "+(p.full_name||p.username),callback_data:"/resetuser:"+p.username}] : null;
     }).filter(Boolean);
     buttons.push([{text:"⬅️ منوی اصلی",callback_data:"/menu"}]);
     return send(chatId,rows.length?"🔑 مشاور را برای بازیابی رمز انتخاب کن:":"مشاوری برای نمایش وجود ندارد.",false,{inline_keyboard:buttons});
@@ -306,6 +321,27 @@ Deno.serve(async (req) => {
     const chatId = message?.chat?.id;
     const fromId = String(update.message?.from?.id || update.callback_query?.from?.id || "");
     if (!chatId || !allowed.has(fromId) || message?.chat?.type !== "private") return new Response("ok");
+    if (update.message?.reply_to_message?.text?.startsWith("➕ افزودن مشاور به «")) {
+      const prompt = update.message.reply_to_message.text;
+      const orgMatch = prompt.match(/نام کاربری انگلیسی مشاور را بفرست\./);
+      const orgNameMatch = prompt.match(/«(.+?)»/);
+      if (orgMatch && orgNameMatch) {
+        const orgs = await db("organizations?select=id,name&name=eq."+encodeURIComponent(orgNameMatch[1]));
+        const org = orgs[0];
+        const username = String(update.message.text || "").trim().replace(/^@/,"");
+        if (!org) await send(chatId,"سازمان پیدا نشد. دوباره از فهرست سازمان‌ها انتخاب کن.");
+        else if (!/^[a-z0-9._-]{3,32}$/i.test(username)) await send(chatId,"نام کاربری معتبر نیست. فقط حروف انگلیسی، عدد، نقطه و خط تیره؛ دوباره تلاش کن.");
+        else {
+          const next = await fetch(tg("sendMessage"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+            chat_id:chatId,text:"مرحله ۲ از ۲: نام و نام خانوادگی مشاور را بفرست.\n(برای لغو /cancel را بفرست)",
+            reply_markup:{force_reply:true,selective:true}
+          })});
+          const data = await next.json();
+          if (!next.ok || !data.ok) throw new Error(data.description || "ارسال پیام ناموفق بود.");
+          await db("telegram_admin_pending", {method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({chat_id:chatId,org_id:org.id,username,step:"full_name",prompt_message_id:data.result.message_id})}).catch(()=>undefined);
+        }
+      }
+    }
     if (update.callback_query?.id) {
       await fetch(tg("answerCallbackQuery"), {
         method: "POST",
