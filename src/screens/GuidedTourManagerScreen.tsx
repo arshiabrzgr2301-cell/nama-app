@@ -48,8 +48,13 @@ export default function GuidedTourManagerScreen({navigation,route}:Props){
   if(p.status!=='granted'){Alert.alert('دسترسی گالری','برای انتخاب تصویر دسترسی لازم است.');return;}
   const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:ImagePicker.MediaTypeOptions.Images,quality:1});
   if(r.canceled||!r.assets[0])return;
+  const asset=r.assets[0];
+  if(asset.width>0&&asset.height>0){
+   const ratio=asset.width/asset.height;
+   if(ratio<1.85||ratio>2.15){Alert.alert('ابعاد تصویر مناسب نیست','برای تور ۳۶۰ باید تصویر کروی با نسبت تقریبی ۲ به ۱ انتخاب کنید. پانورامای معمولی گوشی لزوماً ۳۶۰ درجه کامل نیست.');return;}
+  }
   setBusy(true);
-  try{await guidedTourApi.addScene(id,room,r.assets[0].uri,scenes.length,scenes.length===0);await refresh();Alert.alert('ذخیره شد','پانوراما به تور اضافه شد.');}
+  try{await guidedTourApi.addScene(id,room,asset.uri,scenes.length,scenes.length===0);await refresh();Alert.alert('ذخیره شد','پانوراما به تور اضافه شد.');}
   catch(e:any){Alert.alert('آپلود ناموفق',e?.message||'تصویر ذخیره نشد.');}
   finally{setBusy(false);}
  };
@@ -88,14 +93,14 @@ export default function GuidedTourManagerScreen({navigation,route}:Props){
 
    {scenes.length>=2?<View style={st.editor}>
     <Text style={st.section}>اتصال تصویری اتاق‌ها</Text>
-    <Text style={st.descSmall}>۱) اتاق مبدأ را انتخاب کنید. ۲) اتاق مقصد را مشخص کنید. ۳) روی تصویر ۳۶۰، جهت در یا راهروی مقصد را لمس کنید.</Text>
+    <Text style={st.descSmall}>۱) اتاق مبدأ را انتخاب کنید. ۲) اتاق مقصد را مشخص کنید. ۳) روی تصویر ۳۶۰، جهت در یا راهروی مقصد را لمس کنید. برای مسیر برگشت، یک اتصال جداگانه از اتاق مقصد به مبدأ بسازید.</Text>
     <Text style={st.label}>اتاق مبدأ</Text>
     <View style={st.chips}>{scenes.map(s=><TouchableOpacity key={s.id} onPress={()=>{setSourceSceneId(s.id);setTargetSceneId(current=>current===s.id?(scenes.find(x=>x.id!==s.id)?.id||''):current);setPoint(null);}} style={[st.chip,sourceSceneId===s.id&&st.chipOn]}><Text style={[st.chipText,sourceSceneId===s.id&&st.chipTextOn]}>{s.title}</Text></TouchableOpacity>)}</View>
     <Text style={st.label}>اتاق مقصد</Text>
     <View style={st.chips}>{targets.map(s=><TouchableOpacity key={s.id} onPress={()=>setTargetSceneId(s.id)} style={[st.chip,targetSceneId===s.id&&st.chipOn]}><Text style={[st.chipText,targetSceneId===s.id&&st.chipTextOn]}>{s.title}</Text></TouchableOpacity>)}</View>
     {sourceScene?.panoramaUrl?<View style={st.preview}><WebView key={sourceScene.id+sourceScene.panoramaUrl} source={{html:editorHtml(sourceScene.panoramaUrl)}} originWhitelist={['*']} javaScriptEnabled domStorageEnabled scrollEnabled={false} onMessage={event=>{try{const data=JSON.parse(event.nativeEvent.data);if(data.type==='point')setPoint({yaw:Number(data.yaw),pitch:Number(data.pitch)});else if(data.type==='error')Alert.alert('نمایش پانوراما',data.message||'بارگذاری تصویر ناموفق بود.');}catch{}}}/></View>:<View style={st.empty}><Text style={st.note}>برای این اتاق تصویر پانورامای قابل نمایش وجود ندارد.</Text></View>}
     {point?<Text style={st.point}>نقطه انتخاب‌شده: زاویه افقی {point.yaw}°، عمودی {point.pitch}°</Text>:<Text style={st.note}>هنوز نقطه‌ای انتخاب نشده است؛ روی تصویر ضربه بزنید.</Text>}
-    <TextInput value={label} onChangeText={setLabel} placeholder="متن روی نقطه اتصال" placeholderTextColor={colors.textMuted} style={st.input}/>
+    <TextInput value={label} onChangeText={setLabel} maxLength={100} placeholder="متن روی نقطه اتصال" placeholderTextColor={colors.textMuted} style={st.input}/>
     <TouchableOpacity style={[st.add,!point&&st.disabled]} onPress={saveLink} disabled={busy||!point}>{busy?<ActivityIndicator color={colors.background}/>:<Text style={st.addText}>ذخیره اتصال اتاق‌ها</Text>}</TouchableOpacity>
    </View>:null}
 
