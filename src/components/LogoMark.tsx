@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
     elevation: 12,
   },
-  glow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(31, 96, 176, 0.12)' },
+  glow: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(31, 96, 176, 0.12)' },
   bar: { position: 'absolute', backgroundColor: colors.primary, shadowColor: colors.primary, shadowOpacity: 0.8, shadowRadius: 8, elevation: 5 },
   leftBar: { backgroundColor: '#25C9F4' },
   diagonal: { backgroundColor: '#8B5CF6', transform: [{ rotate: '-43deg' }] },
