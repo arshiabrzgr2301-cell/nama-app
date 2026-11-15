@@ -17,6 +17,7 @@ import TourViewerScreen from '../screens/TourViewerScreen';
 import VRModeScreen from '../screens/VRModeScreen';
 import VideoProcessingScreen from '../screens/VideoProcessingScreen';
 import ScanGuideScreen from '../screens/ScanGuideScreen';
+import GuidedTourManagerScreen from '../screens/GuidedTourManagerScreen';
 
 enableScreens(true);
 enableFreeze(true);
@@ -62,6 +63,7 @@ export default function AppNavigator() {
         <Stack.Screen name="VRMode" component={VRModeScreen} options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="VideoProcessing" component={VideoProcessingScreen} />
         <Stack.Screen name="ScanGuide" component={ScanGuideScreen} />
+        <Stack.Screen name="GuidedTourManager" component={GuidedTourManagerScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
