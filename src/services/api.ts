@@ -42,7 +42,7 @@ async function request<T>(path:string,options:RequestInit={},retry=true):Promise
  const headers:Record<string,string>={apikey:SUPABASE_ANON_KEY,Accept:'application/json','Content-Type':'application/json',
   ...(token?{Authorization:'Bearer '+token}:{}),...(options.headers as Record<string,string>||{})};
  const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{...options,headers});
- if(r.status===401&&retry){token=await refreshSession()||undefined;if(token)return request<T>(path,options,false);}
+ if(r.status===401&&retry){token=await refreshSession();if(token)return request<T>(path,options,false);}
  if(!r.ok){const raw=await r.text();let msg=raw;try{const j=JSON.parse(raw);msg=j.message||j.details||j.hint||j.error_description||raw;}catch{}throw new Error(msg||'خطای سرور ('+r.status+')');}
  if(r.status===204)return {} as T;const raw=await r.text();return(raw?JSON.parse(raw):{}) as T;
 }
