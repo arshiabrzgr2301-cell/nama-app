@@ -60,7 +60,7 @@ jobs:
               raw = row * h
               ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
               data = chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw, 1)) + chunk(b'IEND', b'')
-              with open(path, 'wb') as f: f.write(b'\\x89PNG\\r\\n\\x1a\\n' + data)
+              with open(path, 'wb') as f: f.write(b'\x89PNG\r\n\x1a\n' + data)
           create_png('assets/icon.png', 512, 512, 34, 211, 238)
           create_png('assets/splash.png', 512, 512, 15, 23, 42)
           create_png('assets/adaptive-icon.png', 512, 512, 34, 211, 238)
@@ -123,5 +123,4 @@ jobs:
         run: |
           echo "NAMA Android Build Summary"
           echo "Build type: $BUILD_TYPE"
-          echo "Signing mode: ${{ steps.signing.outputs.mode }}"
           ls -lh dist/ 2>/dev/null || true
