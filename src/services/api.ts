@@ -91,7 +91,7 @@ export const api = {
   const rows=await request<Property[]>('properties?select=*',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(body)});return rows[0];
  },
  updateProperty:async(id:string,data:Record<string,unknown>)=>{const rows=await request<Property[]>('properties?id=eq.'+encodeURIComponent(id)+'&select=*',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(data)});if(!rows.length)throw new Error('فایل به‌روزرسانی نشد یا دسترسی ندارید.');return rows[0];},
- deleteProperty:(id:string)=>request<void>('properties?id=eq.'+encodeURIComponent(id),{method:'DELETE'}),
+ deleteProperty:(id:string)=>edge<{success:boolean}>('delete-property',{propertyId:id}).then(result=>{if(!result.success)throw new Error('حذف فایل تأیید نشد.');}),
  publishProperty:(id:string)=>api.updateProperty(id,{status:'published'}),
  setDraft:(id:string)=>api.updateProperty(id,{status:'draft'}),
  setDealStatus:(id:string,status:DealStatus,soldByConsultantId?:string)=>api.updateProperty(id,{deal_status:status,sold_by_consultant_id:status==='sold'?soldByConsultantId:null}),
