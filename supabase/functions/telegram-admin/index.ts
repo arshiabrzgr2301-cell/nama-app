@@ -91,14 +91,16 @@ async function createManager(orgId: string, username: string, fullName: string) 
   }
   return { id: created.id, username: clean, password: tempPassword };
 }
-async function createOffice(name: string, username: string, fullName: string, chatId: number) {
+async function createOffice(name: string, phone: string, username: string, fullName: string, chatId: number) {
   const cleanName = name.trim();
+  const cleanPhone = phone.trim();
   if (cleanName.length < 2 || cleanName.length > 120) throw new Error("نام دفتر باید بین ۲ تا ۱۲۰ نویسه باشد.");
+  if (!/^[+0-9۰-۹()\-\s]{7,20}$/.test(cleanPhone)) throw new Error("شماره تماس دفتر معتبر نیست؛ شماره را با کد کشور یا بدون آن وارد کن.");
   const existing = await db(`organizations?select=id&name=eq.${encodeURIComponent(cleanName)}&limit=1`);
   if (existing.length) throw new Error("دفتری با این نام قبلاً ثبت شده است.");
   const offices = await db("organizations", {
     method: "POST", headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ name: cleanName, status: "active" }),
+    body: JSON.stringify({ name: cleanName, phone: cleanPhone, status: "active" }),
   });
   const office = offices?.[0];
   if (!office?.id) throw new Error("ساخت دفتر انجام نشد.");
@@ -111,7 +113,7 @@ async function createOffice(name: string, username: string, fullName: string, ch
       body: JSON.stringify({ organization_id: office.id, status: "pending" }),
     });
     await send(chatId,
-      `✅ دفتر با موفقیت ایجاد شد.\n\n🏢 دفتر: ${cleanName}\n🆔 شناسه دفتر: ${office.id}\n👤 مدیر دفتر: ${fullName}\n🔐 نام کاربری: ${manager.username}\n🔑 رمز موقت: ${manager.password}\n\nاشتراک هنوز فعال نشده است. برای فعال‌سازی از بخش «تمدید اشتراک» اقدام کن.\n\nاین اطلاعات را فقط به مدیر دفتر تحویل بده.`);
+      `✅ دفتر با موفقیت ایجاد شد.\n\n🏢 دفتر: ${cleanName}\n📞 شماره تماس دفتر: ${cleanPhone}\n🆔 شناسه دفتر: ${office.id}\n👤 مدیر دفتر: ${fullName}\n🔐 نام کاربری: ${manager.username}\n🔑 رمز موقت: ${manager.password}\n\nاشتراک هنوز فعال نشده است. برای فعال‌سازی از بخش «تمدید اشتراک» اقدام کن.\n\nاین اطلاعات را فقط به مدیر دفتر تحویل بده.`);
   } catch (error) {
     if (managerId) {
       await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${managerId}`, { method: "DELETE", headers: DB_HEADERS }).catch(() => undefined);
@@ -121,7 +123,7 @@ async function createOffice(name: string, username: string, fullName: string, ch
   }
 }
 async function officeRows() {
-  return db("organizations?select=id,name,status,created_at,organization_subscriptions(status,starts_at,expires_at)&order=created_at.desc&limit=100");
+  return db("organizations?select=id,name,phone,status,created_at,organization_subscriptions(status,starts_at,expires_at)&order=created_at.desc&limit=100");
 }
 function subscriptionInfo(office: any) {
   const raw = office.organization_subscriptions;
@@ -133,7 +135,7 @@ function subscriptionInfo(office: any) {
   return { sub, expiry, remaining, label };
 }
 async function officeDetail(chatId: number, id: string) {
-  const rows = await db(`organizations?select=id,name,status,created_at,organization_subscriptions(status,starts_at,expires_at)&id=eq.${encodeURIComponent(id)}&limit=1`);
+  const rows = await db(`organizations?select=id,name,phone,status,created_at,organization_subscriptions(status,starts_at,expires_at)&id=eq.${encodeURIComponent(id)}&limit=1`);
   if (!rows.length) return send(chatId, "دفتر موردنظر پیدا نشد.");
   const office = rows[0];
   const [members, subscription] = await Promise.all([
@@ -157,7 +159,7 @@ async function officeDetail(chatId: number, id: string) {
     [{ text: "⬅️ بازگشت به دفاتر", callback_data: "/orgs" }, { text: "🏠 منوی اصلی", callback_data: "/menu" }],
   ] };
   return send(chatId,
-    `🏢 ${office.name}\n\nوضعیت دفتر: ${office.status === "active" ? "فعال" : "تعلیق‌شده"}\nاشتراک: ${subscription.label}\nانقضا: ${date}\nباقی‌مانده: ${days}\nمدیر: ${manager?.full_name || "ثبت نشده"}\nنام کاربری مدیر: ${manager?.username ? "@" + manager.username : "ثبت نشده"}\n\nمدیریت مشاوران و فایل‌های املاک از داخل اپلیکیشن و توسط مدیر همین دفتر انجام می‌شود.`, keyboard);
+    `🏢 ${office.name}\n📞 شماره تماس دفتر: ${office.phone || "ثبت نشده"}\n\nوضعیت دفتر: ${office.status === "active" ? "فعال" : "تعلیق‌شده"}\nاشتراک: ${subscription.label}\nانقضا: ${date}\nباقی‌مانده: ${days}\nمدیر: ${manager?.full_name || "ثبت نشده"}\nنام کاربری مدیر: ${manager?.username ? "@" + manager.username : "ثبت نشده"}\n\nمدیریت مشاوران و فایل‌های املاک از داخل اپلیکیشن و توسط مدیر همین دفتر انجام می‌شود.`, keyboard);
 }
 async function renewOffice(chatId: number, id: string, days: number) {
   if (!Number.isInteger(days) || days < 1 || days > 3650) throw new Error("مدت اشتراک نامعتبر است.");
@@ -262,21 +264,22 @@ async function handle(chatId: number, rawText: string) {
   }
   if (command === "/help") {
     return send(chatId,
-      "📚 راهنمای پنل مرکزی NAMA\n\n/neworg نام_دفتر نام_کاربری_مدیر نام_کامل_مدیر\n/orgs نمایش دفاتر\n/renew شناسه_دفتر تعداد_روز\n/suspendorg شناسه_دفتر\n/activateorg شناسه_دفتر\n/resetmanager شناسه_دفتر\n/deleteorg شناسه_دفتر (حذف دائمی با تأیید)\n\nافزودن، غیرفعال‌سازی و مدیریت مشاوران فقط از داخل اپلیکیشن و توسط مدیر همان دفتر انجام می‌شود.\nدستور قدیمی /adduser دیگر برای ساخت حساب استفاده نمی‌شود.");
+      "📚 راهنمای پنل مرکزی NAMA\n\n/neworg نام_دفتر شماره_تماس نام_کاربری_مدیر نام_کامل_مدیر\n/orgs نمایش دفاتر\n/renew شناسه_دفتر تعداد_روز\n/suspendorg شناسه_دفتر\n/activateorg شناسه_دفتر\n/resetmanager شناسه_دفتر\n/deleteorg شناسه_دفتر (حذف دائمی با تأیید)\n\nافزودن، غیرفعال‌سازی و مدیریت مشاوران فقط از داخل اپلیکیشن و توسط مدیر همان دفتر انجام می‌شود.\nدستور قدیمی /adduser دیگر برای ساخت حساب استفاده نمی‌شود.");
   }
   if (command === "/neworg" && args.length === 0) {
     return telegram("sendMessage", {
       chat_id: chatId,
-      text: "NAMA_NEW_OFFICE\nبرای ایجاد دفتر، اطلاعات را در یک پیام و با جداکننده | بفرست:\nنام دفتر | نام کاربری مدیر | نام و نام خانوادگی مدیر\n\nمثال:\nاملاک آفتاب | aftab.manager | علی رضایی",
+      text: "NAMA_NEW_OFFICE\nبرای ایجاد دفتر، اطلاعات را در یک پیام و با جداکننده | بفرست:\nنام دفتر | شماره تماس دفتر | نام کاربری مدیر | نام و نام خانوادگی مدیر\n\nمثال:\nاملاک آفتاب | 09121234567 | aftab.manager | علی رضایی",
       reply_markup: { force_reply: true, selective: true },
     });
   }
   if (command === "/neworg") {
-    if (args.length < 3) throw new Error("فرمت صحیح: /neworg نام_دفتر نام_کاربری_مدیر نام_کامل_مدیر");
+    if (args.length < 4) throw new Error("فرمت صحیح: /neworg نام_دفتر شماره_تماس نام_کاربری_مدیر نام_کامل_مدیر");
     const name = args[0].replace(/_/g, " ");
-    const username = args[1];
-    const fullName = args.slice(2).join(" ").replace(/_/g, " ");
-    return createOffice(name, username, fullName, chatId);
+    const phone = args[1];
+    const username = args[2];
+    const fullName = args.slice(3).join(" ").replace(/_/g, " ");
+    return createOffice(name, phone, username, fullName, chatId);
   }
   if (command === "/adduser" || command.startsWith("/orgadd:") || command.startsWith("/membertoggle:")) {
     return send(chatId, "👤 ساخت و مدیریت مشاوران از این پس فقط توسط مدیر همان دفتر و از بخش «مشاوران دفتر» داخل اپلیکیشن NAMA انجام می‌شود. ربات مرکزی دیگر حساب مشاور ایجاد یا مدیریت نمی‌کند.");
@@ -391,10 +394,10 @@ Deno.serve(async (req: Request) => {
     const replyText = safeText(message?.reply_to_message?.text, 1000);
     if (message?.text && replyText.startsWith("NAMA_NEW_OFFICE")) {
       const parts = String(message.text).split("|").map((v: string) => v.trim());
-      if (parts.length < 3) {
-        await send(chat.id, "اطلاعات ناقص است. لطفاً دقیقاً با این قالب بفرست:\nنام دفتر | نام کاربری مدیر | نام و نام خانوادگی مدیر");
+      if (parts.length < 4) {
+        await send(chat.id, "اطلاعات ناقص است. لطفاً هر چهار مورد را با | جدا کن:\nنام دفتر | شماره تماس دفتر | نام کاربری مدیر | نام و نام خانوادگی مدیر");
       } else {
-        await createOffice(parts[0], parts[1], parts.slice(2).join(" "), chat.id);
+        await createOffice(parts[0], parts[1], parts[2], parts.slice(3).join(" "), chat.id);
       }
       return new Response("ok");
     }
