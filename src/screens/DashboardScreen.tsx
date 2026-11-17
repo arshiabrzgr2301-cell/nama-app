@@ -7,45 +7,27 @@ import { RootStackParamList } from '../types';
 import { colors, spacing } from '../theme';
 import { api, Property, Consultant, AppUser } from '../services/api';
 import { clearAuth, getUser } from '../utils/storage';
-import { scheduleDailyActivityReminder } from '../utils/notifications';
+import { scheduleDailyActivityReminder, cancelDailyActivityReminder } from '../utils/notifications';
 type Props={navigation:NativeStackNavigationProp<RootStackParamList,'Dashboard'>};
-const isManager=(r?:string)=>r==='owner'||r==='manager';
-const money=(n:number)=>n>=1e9?(n/1e9).toFixed(1)+' میلیارد تومان':Math.round(n/1e6).toLocaleString('fa-IR')+' میلیون تومان';
-function Card({item,owner,soldBy,onPress}:{item:Property;owner:string;soldBy:string;onPress:()=>void}){
- return <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={.88}>
-  {item.deal_status!=='active'&&<View style={[styles.ribbon,item.deal_status==='sold'?styles.sold:styles.deposit]}><Text style={styles.ribbonText}>{item.deal_status==='sold'?'فروخته شد'+(soldBy?' توسط '+soldBy:''):'بیعانه شد'}</Text></View>}
-  <View style={styles.cardHead}><Text style={styles.cardTitle}>{item.title}</Text><Text style={[styles.status,item.status==='published'?styles.published:styles.draft]}>{item.status==='published'?'فعال':'پیش‌نویس'}</Text></View>
-  <Text style={styles.meta}>{item.city} · {item.neighborhood||item.address} · {item.area} متر · {item.rooms} خواب</Text>
-  <Text style={styles.price}>{money(Number(item.price||0))}</Text><Text style={styles.owner}>فایل {owner}</Text>
- </TouchableOpacity>;
-}
+const isManager=(r?:string)=>r==='owner'||r==='manager';const money=(n:number)=>n>=1e9?(n/1e9).toFixed(1)+' میلیارد تومان':Math.round(n/1e6).toLocaleString('fa-IR')+' میلیون تومان';
+function Card({item,owner,soldBy,onPress}:{item:Property;owner:string;soldBy:string;onPress:()=>void}){return <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={.88}>
+ {item.deal_status!=='active'&&<View style={[styles.ribbon,item.deal_status==='sold'?styles.sold:styles.deposit]}><Text style={styles.ribbonText}>{item.deal_status==='sold'?'فروخته شد'+(soldBy?' توسط '+soldBy:''):'بیعانه شد'}</Text></View>}
+ <View style={styles.cardHead}><Text style={styles.cardTitle}>{item.title}</Text><Text style={[styles.status,item.status==='published'?styles.published:styles.draft]}>{item.status==='published'?'فعال':'پیش‌نویس'}</Text></View>
+ <Text style={styles.meta}>{item.city} · {item.neighborhood||item.address} · {item.area} متر · {item.rooms} خواب</Text><Text style={styles.price}>{money(Number(item.price||0))}</Text><Text style={styles.owner}>فایل {owner}</Text>
+ </TouchableOpacity>}
 export default function DashboardScreen({navigation}:Props){
  const [properties,setProperties]=useState<Property[]>([]),[consultants,setConsultants]=useState<Consultant[]>([]),[user,setUser]=useState<AppUser|null>(null),[refreshing,setRefreshing]=useState(false);
  const [advisor,setAdvisor]=useState(''),[deal,setDeal]=useState('all'),[search,setSearch]=useState(''),[showFilters,setShowFilters]=useState(false);
  const [minPrice,setMinPrice]=useState(''),[maxPrice,setMaxPrice]=useState(''),[minArea,setMinArea]=useState(''),[maxArea,setMaxArea]=useState(''),[rooms,setRooms]=useState(''),[city,setCity]=useState(''),[type,setType]=useState(''),[yearFrom,setYearFrom]=useState(''),[yearTo,setYearTo]=useState(''),[dateFrom,setDateFrom]=useState(''),[dateTo,setDateTo]=useState('');
- const load=useCallback(async()=>{const u=await getUser<AppUser>();setUser(u);if(u?.role==='consultant')scheduleDailyActivityReminder().catch(()=>{});const [p,c]=await Promise.all([api.getProperties(),api.getConsultants()]);setProperties(p);setConsultants(c);},[]);
- useFocusEffect(useCallback(()=>{load().catch(e=>Alert.alert('خطا',e.message));},[load]));
+ const load=useCallback(async()=>{const u=await getUser<AppUser>();setUser(u);if(u?.role==='consultant')scheduleDailyActivityReminder().catch(()=>{});const[p,c]=await Promise.all([api.getProperties(),api.getConsultants()]);setProperties(p);setConsultants(c)},[]);
+ useFocusEffect(useCallback(()=>{load().catch(e=>Alert.alert('خطا',e.message))},[load]));
  const manager=isManager(user?.role);
- const filtered=useMemo(()=>properties.filter(p=>{
-  const q=search.trim().toLowerCase();
-  const created=String(p.created_at||'').slice(0,10);
-  return (!advisor||p.file_owner_id===advisor)
-   &&(deal==='all'||p.deal_status===deal)
-   &&(!q||[p.title,p.city,p.address,p.neighborhood].some(v=>String(v||'').toLowerCase().includes(q)))
-   &&(!minPrice||Number(p.price)>=Number(minPrice))&&(!maxPrice||Number(p.price)<=Number(maxPrice))
-   &&(!minArea||Number(p.area)>=Number(minArea))&&(!maxArea||Number(p.area)<=Number(maxArea))
-   &&(!rooms||Number(p.rooms)===Number(rooms))
-   &&(!city||String(p.city+' '+(p.neighborhood||'')).toLowerCase().includes(city.toLowerCase()))
-   &&(!type||String(p.property_type||'').toLowerCase().includes(type.toLowerCase()))
-   &&(!yearFrom||Number(p.year_built||0)>=Number(yearFrom))&&(!yearTo||Number(p.year_built||0)<=Number(yearTo))
-   &&(!dateFrom||created>=dateFrom)&&(!dateTo||created<=dateTo);
- }),[properties,advisor,deal,search,minPrice,maxPrice,minArea,maxArea,rooms,city,type,yearFrom,yearTo,dateFrom,dateTo]);
- const owner=(id:string)=>consultants.find(c=>c.id===id)?.fullName||(id===user?.id?user?.name:'مشاور');
- const soldBy=(id?:string|null)=>consultants.find(c=>c.id===id)?.fullName||'';
- const logout=()=>Alert.alert('خروج','از حساب خارج شوید؟',[{text:'انصراف',style:'cancel'},{text:'خروج',style:'destructive',onPress:async()=>{await clearAuth();navigation.replace('Home');}}]);
- const refresh=async()=>{setRefreshing(true);try{await load();}finally{setRefreshing(false);}};
- const clearFilters=()=>{setMinPrice('');setMaxPrice('');setMinArea('');setMaxArea('');setRooms('');setCity('');setType('');setYearFrom('');setYearTo('');setDateFrom('');setDateTo('');setAdvisor('');setDeal('all');setSearch('');};
- const FilterField=({label,value,onChangeText,placeholder}:{label:string;value:string;onChangeText:(v:string)=>void;placeholder?:string})=><View style={styles.filterField}><Text style={styles.filterLabel}>{label}</Text><TextInput style={styles.filterInput} value={value} onChangeText={onChangeText} placeholder={placeholder||'—'} placeholderTextColor={colors.textMuted} keyboardType="numeric" textAlign="right"/></View>;
+ const filtered=useMemo(()=>properties.filter(p=>{const q=search.trim().toLowerCase(),created=String(p.created_at||'').slice(0,10);return(!advisor||p.file_owner_id===advisor)&&(deal==='all'||p.deal_status===deal)&&(!q||[p.title,p.city,p.address,p.neighborhood].some(v=>String(v||'').toLowerCase().includes(q)))&&(!minPrice||Number(p.price)>=Number(minPrice))&&(!maxPrice||Number(p.price)<=Number(maxPrice))&&(!minArea||Number(p.area)>=Number(minArea))&&(!maxArea||Number(p.area)<=Number(maxArea))&&(!rooms||Number(p.rooms)===Number(rooms))&&(!city||String(p.city+' '+(p.neighborhood||'')).toLowerCase().includes(city.toLowerCase()))&&(!type||String(p.property_type||'').toLowerCase().includes(type.toLowerCase()))&&(!yearFrom||Number(p.year_built||0)>=Number(yearFrom))&&(!yearTo||Number(p.year_built||0)<=Number(yearTo))&&(!dateFrom||created>=dateFrom)&&(!dateTo||created<=dateTo)}),[properties,advisor,deal,search,minPrice,maxPrice,minArea,maxArea,rooms,city,type,yearFrom,yearTo,dateFrom,dateTo]);
+ const owner=(id:string)=>consultants.find(c=>c.id===id)?.fullName||(id===user?.id?user?.name:'مشاور'),soldBy=(id?:string|null)=>consultants.find(c=>c.id===id)?.fullName||'';
+ const logout=()=>Alert.alert('خروج','از حساب خارج شوید؟',[{text:'انصراف',style:'cancel'},{text:'خروج',style:'destructive',onPress:async()=>{await cancelDailyActivityReminder();await clearAuth();navigation.replace('Home')}}]);
+ const refresh=async()=>{setRefreshing(true);try{await load()}finally{setRefreshing(false)}};
+ const clearFilters=()=>{setMinPrice('');setMaxPrice('');setMinArea('');setMaxArea('');setRooms('');setCity('');setType('');setYearFrom('');setYearTo('');setDateFrom('');setDateTo('');setAdvisor('');setDeal('all');setSearch('')};
+ const F=({label,value,onChangeText}:{label:string;value:string;onChangeText:(v:string)=>void})=><View style={styles.filterField}><Text style={styles.filterLabel}>{label}</Text><TextInput style={styles.filterInput} value={value} onChangeText={onChangeText} placeholder="—" placeholderTextColor={colors.textMuted} keyboardType="numeric" textAlign="right"/></View>;
  return <SafeAreaView style={styles.container} edges={['top']}>
   <View style={styles.header}><View style={{flex:1}}><Text style={styles.greeting}>سلام، {user?.name||'کاربر NAMA'}</Text><Text style={styles.office}>{manager?'حساب مدیریت':'حساب مشاور'} · {user?.officeName}</Text></View><TouchableOpacity onPress={logout}><Text style={styles.logout}>خروج</Text></TouchableOpacity></View>
   <View style={styles.actions}>{manager&&<TouchableOpacity style={styles.primaryAction} onPress={()=>navigation.navigate('AddProperty')}><Text style={styles.primaryText}>+ ثبت فایل</Text></TouchableOpacity>}{manager&&<TouchableOpacity style={styles.action} onPress={()=>navigation.navigate('Team')}><Text style={styles.actionText}>مشاوران دفتر</Text></TouchableOpacity>}<TouchableOpacity style={styles.action} onPress={()=>navigation.navigate('Activity')}><Text style={styles.actionText}>{manager?'عملکرد مشاوران':'ثبت عملکرد امروز'}</Text></TouchableOpacity><TouchableOpacity style={styles.action} onPress={()=>navigation.navigate('Reminders')}><Text style={styles.actionText}>یادآوری‌های من</Text></TouchableOpacity></View>
@@ -54,15 +36,14 @@ export default function DashboardScreen({navigation}:Props){
   <FlatList horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.advisors} data={[{id:'',fullName:'همه مشاوران',username:'',status:'active'},...consultants]} keyExtractor={x=>x.id||'all'} renderItem={({item})=><TouchableOpacity onPress={()=>setAdvisor(item.id)} style={[styles.filterChip,advisor===item.id&&styles.filterActive]}><Text style={[styles.filterText,advisor===item.id&&{color:colors.primary}]}>{item.fullName}</Text></TouchableOpacity>}/>
   <Text style={styles.section}>فایل‌های دفتر · {filtered.length.toLocaleString('fa-IR')} مورد</Text>
   <FlatList data={filtered} keyExtractor={x=>x.id} renderItem={({item})=><Card item={item} owner={owner(item.file_owner_id)} soldBy={soldBy(item.sold_by_consultant_id)} onPress={()=>navigation.navigate('PropertyDetail',{id:item.id})}/>} contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary}/>} ListEmptyComponent={<Text style={styles.empty}>فایلی مطابق این فیلتر پیدا نشد.</Text>}/>
-  <Modal visible={showFilters} transparent animationType="slide" onRequestClose={()=>setShowFilters(false)}><View style={styles.overlay}><ScrollView contentContainerStyle={styles.modal}>
-   <Text style={styles.modalTitle}>فیلتر پیشرفته فایل‌ها</Text>
-   <View style={styles.twoCol}><FilterField label="حداقل قیمت (تومان)" value={minPrice} onChangeText={setMinPrice}/><FilterField label="حداکثر قیمت (تومان)" value={maxPrice} onChangeText={setMaxPrice}/></View>
-   <View style={styles.twoCol}><FilterField label="حداقل متراژ" value={minArea} onChangeText={setMinArea}/><FilterField label="حداکثر متراژ" value={maxArea} onChangeText={setMaxArea}/></View>
-   <View style={styles.twoCol}><FilterField label="تعداد خواب" value={rooms} onChangeText={setRooms}/><FilterField label="نوع ملک" value={type} onChangeText={setType}/></View>
+  <Modal visible={showFilters} transparent animationType="slide" onRequestClose={()=>setShowFilters(false)}><View style={styles.overlay}><ScrollView contentContainerStyle={styles.modal}><Text style={styles.modalTitle}>فیلتر پیشرفته فایل‌ها</Text>
+   <View style={styles.twoCol}><F label="حداقل قیمت (تومان)" value={minPrice} onChangeText={setMinPrice}/><F label="حداکثر قیمت (تومان)" value={maxPrice} onChangeText={setMaxPrice}/></View>
+   <View style={styles.twoCol}><F label="حداقل متراژ" value={minArea} onChangeText={setMinArea}/><F label="حداکثر متراژ" value={maxArea} onChangeText={setMaxArea}/></View>
+   <View style={styles.twoCol}><F label="تعداد خواب" value={rooms} onChangeText={setRooms}/><View style={styles.filterField}><Text style={styles.filterLabel}>نوع ملک</Text><TextInput style={styles.filterInput} value={type} onChangeText={setType} placeholder="آپارتمان، ویلا..." placeholderTextColor={colors.textMuted} textAlign="right"/></View></View>
    <Text style={styles.filterLabel}>شهر یا محله</Text><TextInput style={styles.filterInput} value={city} onChangeText={setCity} placeholder="تهران، سعادت‌آباد..." placeholderTextColor={colors.textMuted} textAlign="right"/>
-   <View style={styles.twoCol}><FilterField label="سال ساخت از" value={yearFrom} onChangeText={setYearFrom}/><FilterField label="سال ساخت تا" value={yearTo} onChangeText={setYearTo}/></View>
-   <Text style={styles.filterLabel}>تاریخ ثبت فایل (YYYY-MM-DD)</Text><View style={styles.twoCol}><TextInput style={styles.filterInput} value={dateFrom} onChangeText={setDateFrom} placeholder="از تاریخ" placeholderTextColor={colors.textMuted}/><TextInput style={styles.filterInput} value={dateTo} onChangeText={setDateTo} placeholder="تا تاریخ" placeholderTextColor={colors.textMuted}/></View>
-   <TouchableOpacity style={styles.apply} onPress={()=>setShowFilters(false)}><Text style={styles.applyText}>اعمال فیلترها ({filtered.length})</Text></TouchableOpacity><TouchableOpacity style={styles.clear} onPress={clearFilters}><Text style={styles.clearText}>پاک‌کردن همه فیلترها</Text></TouchableOpacity>
+   <View style={styles.twoCol}><F label="سال ساخت از" value={yearFrom} onChangeText={setYearFrom}/><F label="سال ساخت تا" value={yearTo} onChangeText={setYearTo}/></View>
+   <Text style={styles.filterLabel}>تاریخ ثبت (YYYY-MM-DD)</Text><View style={styles.twoCol}><TextInput style={styles.filterInput} value={dateFrom} onChangeText={setDateFrom} placeholder="از تاریخ" placeholderTextColor={colors.textMuted}/><TextInput style={styles.filterInput} value={dateTo} onChangeText={setDateTo} placeholder="تا تاریخ" placeholderTextColor={colors.textMuted}/></View>
+   <TouchableOpacity style={styles.apply} onPress={()=>setShowFilters(false)}><Text style={styles.applyText}>اعمال فیلترها</Text></TouchableOpacity><TouchableOpacity style={styles.clear} onPress={clearFilters}><Text style={styles.clearText}>پاک‌کردن همه فیلترها</Text></TouchableOpacity>
   </ScrollView></View></Modal>
  </SafeAreaView>;
 }
