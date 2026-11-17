@@ -29,11 +29,7 @@ if (!I18nManager.isRTL) {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-type AppNavigatorProps = {
-  onReady?: () => void;
-};
-
-export default function AppNavigator({ onReady }: AppNavigatorProps) {
+export default function AppNavigator() {
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
 
   useEffect(() => {
@@ -52,7 +48,7 @@ export default function AppNavigator({ onReady }: AppNavigatorProps) {
   }
 
   return (
-    <NavigationContainer onReady={onReady}>
+    <NavigationContainer>
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
