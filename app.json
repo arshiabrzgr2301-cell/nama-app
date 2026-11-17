@@ -2,51 +2,24 @@
   "expo": {
     "name": "NAMA",
     "slug": "nama-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "jsEngine": "hermes",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0f172a"
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "ir.nama.app"
-    },
+    "splash": { "image": "./assets/splash.png", "resizeMode": "contain", "backgroundColor": "#0f172a" },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "ir.nama.app" },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f172a"
-      },
+      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#0f172a" },
       "package": "ir.nama.app",
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "INTERNET"
-      ]
+      "permissions": ["CAMERA","READ_EXTERNAL_STORAGE","WRITE_EXTERNAL_STORAGE","INTERNET","POST_NOTIFICATIONS","SCHEDULE_EXACT_ALARM"]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "nama-app-local"
-      }
-    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "extra": { "eas": { "projectId": "nama-app-local" } },
     "plugins": [
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "برای آپلود تصاویر پانوراما و ویدیوهای اسکن خانه، دسترسی به گالری لازم است."
-        }
-      ]
+      ["expo-image-picker", { "photosPermission": "برای آپلود تصاویر پانوراما و ویدیوهای اسکن خانه، دسترسی به گالری لازم است." }],
+      ["expo-notifications", { "color": "#22d3ee" }]
     ]
   }
 }

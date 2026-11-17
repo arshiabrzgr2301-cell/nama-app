@@ -1,252 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  Share,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Linking, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
-import { colors, spacing, borderRadius } from '../theme';
-import { api, Property } from '../services/api';
-
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'PropertyDetail'>;
-  route: RouteProp<RootStackParamList, 'PropertyDetail'>;
-};
-
-export default function PropertyDetailScreen({ navigation, route }: Props) {
-  const { id } = route.params;
-  const [property, setProperty] = useState<Property | null>(null);
-
-  useEffect(() => {
-    api
-      .getProperty(id)
-      .then(setProperty)
-      .catch(() => {
-        setProperty({
-          id,
-          title: 'آپارتمان نمونه',
-          city: 'تهران',
-          address: 'سعادت‌آباد',
-          price: 18500000000,
-          area: 145,
-          rooms: 3,
-          floor: 5,
-          description: 'نورگیر عالی، بازسازی کامل، دسترسی عالی به مترو.',
-          status: 'published',
-          views: 42,
-          publicTourUrl: 'https://nama.ir/t/' + id,
-          createdAt: new Date().toISOString(),
-        });
-      });
-  }, [id]);
-
-  if (!property) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loading}>در حال بارگذاری...</Text>
-      </SafeAreaView>
-    );
-  }
-
-  const formatPrice = (p: number) => {
-    if (p >= 1e9) return (p / 1e9).toFixed(1) + ' میلیارد تومان';
-    return p.toLocaleString('fa-IR') + ' تومان';
-  };
-
-  const shareTour = async () => {
-    const url = property.publicTourUrl || `https://nama.ir/t/${property.id}`;
-    try {
-      await Share.share({
-        message: `تور مجازی ملک «${property.title}» را ببینید:\n${url}`,
-        url,
-      });
-    } catch {}
-  };
-
-  const toggleStatus = async () => {
-    try {
-      if (property.status === 'published') {
-        await api.setDraft(id);
-        setProperty({ ...property, status: 'draft' });
-      } else {
-        await api.publishProperty(id);
-        setProperty({ ...property, status: 'published' });
-      }
-    } catch {
-      setProperty({
-        ...property,
-        status: property.status === 'published' ? 'draft' : 'published',
-      });
-    }
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← بازگشت</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          جزئیات ملک
-        </Text>
-        <View style={{ width: 60 }} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{property.title}</Text>
-        <View
-          style={[
-            styles.badge,
-            property.status === 'published' ? styles.badgePub : styles.badgeDraft,
-          ]}
-        >
-          <Text style={styles.badgeText}>
-            {property.status === 'published' ? 'منتشر شده' : 'پیش‌نویس'}
-          </Text>
-        </View>
-
-        <Text style={styles.price}>{formatPrice(property.price)}</Text>
-
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>{property.city}</Text>
-          <Text style={styles.meta}>{property.area} متر</Text>
-          <Text style={styles.meta}>{property.rooms} خواب</Text>
-          <Text style={styles.meta}>طبقه {property.floor}</Text>
-        </View>
-
-        <Text style={styles.address}>{property.address}</Text>
-
-        <Text style={styles.section}>توضیحات</Text>
-        <Text style={styles.desc}>{property.description || '—'}</Text>
-
-        <Text style={styles.views}>👁 {property.views || 0} بازدید تور</Text>
-
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() =>
-            navigation.navigate('TourViewer', {
-              id: property.id,
-              panoramaUrl: property.publicTourUrl,
-            })
-          }
-        >
-          <Text style={styles.primaryBtnText}>مشاهده تور ۳۶۰</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryBtn} onPress={shareTour}>
-          <Text style={styles.secondaryBtnText}>اشتراک لینک عمومی تور</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryBtn} onPress={toggleStatus}>
-          <Text style={styles.secondaryBtnText}>
-            {property.status === 'published' ? 'تبدیل به پیش‌نویس' : 'انتشار ملک'}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
+import { colors, spacing } from '../theme';
+import { api, Property, Consultant, AppUser } from '../services/api';
+import { getUser } from '../utils/storage';
+type Props={navigation:NativeStackNavigationProp<RootStackParamList,'PropertyDetail'>;route:RouteProp<RootStackParamList,'PropertyDetail'>};
+const isManager=(r?:string)=>r==='owner'||r==='manager';
+const money=(n?:number|null)=>n==null?'—':Number(n).toLocaleString('fa-IR')+' تومان';
+function Info({label,value}:{label:string;value?:string|null}){return <View style={styles.info}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value||'ثبت نشده'}</Text></View>}
+export default function PropertyDetailScreen({navigation,route}:Props){
+ const {id}=route.params;const [property,setProperty]=useState<Property|null>(null),[user,setUser]=useState<AppUser|null>(null),[consultants,setConsultants]=useState<Consultant[]>([]),[photos,setPhotos]=useState<any[]>([]),[privateVisible,setPrivateVisible]=useState(false),[saleModal,setSaleModal]=useState(false);
+ useFocusEffect(useCallback(()=>()=>setPrivateVisible(false),[]));
+ const load=async()=>{const [p,u,c,media]=await Promise.all([api.getProperty(id),getUser<AppUser>(),api.getConsultants(),api.getPropertyPhotos(id)]);setProperty(p);setUser(u);setConsultants(c);setPhotos(media);};
+ useEffect(()=>{load().catch(e=>Alert.alert('خطا',e.message));},[id]);
+ if(!property)return <SafeAreaView style={styles.container}><Text style={styles.loading}>در حال بارگذاری فایل...</Text></SafeAreaView>;
+ const fileOwner=consultants.find(c=>c.id===property.file_owner_id),soldBy=consultants.find(c=>c.id===property.sold_by_consultant_id);
+ const change=async(status:'active'|'deposit'|'sold',soldById?:string)=>{try{const p=await api.setDealStatus(id,status,soldById);setProperty(p);setSaleModal(false);Alert.alert('ثبت شد','وضعیت فایل به‌روزرسانی شد.');}catch(e:any){Alert.alert('خطا',e.message||'تغییر وضعیت انجام نشد.');}};
+ const coordinates=property.latitude!=null&&property.longitude!=null?property.latitude+','+property.longitude:null;
+ const openNeshan=async()=>{if(!coordinates)return;const uri=Platform.OS==='ios'?'neshan://?destination='+coordinates:'https://nshn.ir?lat='+property.latitude+'&lng='+property.longitude;try{await Linking.openURL(uri);}catch{await Linking.openURL('https://neshan.org/maps/share/'+coordinates);}};
+ const openBalad=async()=>{if(!coordinates)return;const uri='geo:'+coordinates+'?q='+coordinates;try{await Linking.openURL(uri);}catch{await Linking.openURL('https://balad.ir');}};
+ const remove=()=>Alert.alert('حذف فایل','این فایل برای همیشه حذف شود؟',[{text:'انصراف',style:'cancel'},{text:'حذف فایل',style:'destructive',onPress:async()=>{try{await api.deleteProperty(id);navigation.goBack();}catch(e:any){Alert.alert('حذف ناموفق',e.message);}}}]);
+ return <SafeAreaView style={styles.container}>
+  <View style={styles.header}><TouchableOpacity onPress={()=>navigation.goBack()}><Text style={styles.back}>بازگشت</Text></TouchableOpacity><Text style={styles.headerTitle}>جزئیات فایل</Text><View style={{width:48}}/></View>
+  <ScrollView contentContainerStyle={styles.content}>
+   {property.deal_status!=='active'&&<View style={[styles.ribbon,property.deal_status==='sold'?styles.sold:styles.deposit]}><Text style={styles.ribbonText}>{property.deal_status==='sold'?'فروخته شد'+(soldBy?' توسط '+soldBy.fullName:''):'بیعانه شد'}</Text></View>}
+   <Text style={styles.title}>{property.title}</Text><Text style={styles.fileOwner}>فایل {fileOwner?.fullName||(property.file_owner_id===user?.id?user?.name:'مشاور دفتر')}</Text>
+   <Text style={styles.price}>{money(Number(property.price))}</Text><Text style={styles.pricePerSqm}>قیمت هر متر مربع: {money(Number(property.area)>0?Number(property.price)/Number(property.area):0)}</Text><View style={styles.meta}>{[property.city,property.neighborhood||property.address,property.property_type||'نوع نامشخص',property.area+' متر',property.rooms+' خواب','طبقه '+property.floor,property.year_built?'ساخت '+property.year_built:''].map((v,i)=><Text key={i} style={styles.chip}>{v}</Text>)}</View>
+   {!!photos.length&&<><Text style={styles.section}>تصاویر ملک</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:8}}>{photos.filter(x=>x.url).map((photo,i)=><Image key={photo.id||i} source={{uri:photo.url}} style={{width:220,height:160,borderRadius:12}} resizeMode="cover"/>)}</ScrollView></>}
+   {!!property.amenities?.length&&<><Text style={styles.section}>امکانات</Text><View style={styles.meta}>{property.amenities.map((a,i)=><Text key={i} style={styles.chip}>{a}</Text>)}</View></>}
+   <Text style={styles.section}>توضیحات</Text><Text style={styles.description}>{property.description||'توضیحی ثبت نشده است.'}</Text>
+   <TouchableOpacity style={styles.primary} onPress={()=>navigation.navigate('TourViewer',{id:property.id})}><Text style={styles.primaryText}>مشاهده تور ۳۶۰ داخلی</Text></TouchableOpacity>
+   <TouchableOpacity style={styles.confidentialButton} onPress={()=>setPrivateVisible(v=>!v)}><Text style={styles.confidentialText}>{privateVisible?'مخفی‌کردن اطلاعات اختصاصی':'🔒 نمایش اطلاعات اختصاصی دفتر'}</Text></TouchableOpacity>
+   {privateVisible&&<View style={styles.privateCard}><Text style={styles.privateTitle}>اطلاعات اختصاصی دفتر</Text>
+    <Info label="نام مالک / فروشنده" value={property.owner_name}/><Info label="شماره تماس مالک" value={property.owner_phone}/><Info label="آدرس دقیق ملک" value={property.exact_address}/><Info label="قیمت واقعی ملک" value={money(property.real_price??property.price)}/><Info label="تاریخ ثبت فایل" value={new Date(property.created_at).toLocaleDateString('fa-IR')}/>
+    {property.latitude!=null&&property.longitude!=null&&<View style={{gap:8,marginTop:12}}><TouchableOpacity style={styles.mapButton} onPress={openNeshan}><Text style={styles.mapButtonText}>بازکردن موقعیت در نشان</Text></TouchableOpacity><TouchableOpacity style={styles.mapButton} onPress={openBalad}><Text style={styles.mapButtonText}>بازکردن موقعیت در بلد / انتخاب مسیریاب</Text></TouchableOpacity></View>}
+   </View>}
+   {isManager(user?.role)&&<View style={styles.managerActions}><Text style={styles.section}>مدیریت فایل</Text>
+    <TouchableOpacity style={styles.statusButton} onPress={()=>navigation.navigate('AddProperty',{propertyId:id})}><Text style={styles.statusText}>ویرایش مشخصات فایل</Text></TouchableOpacity>
+    <TouchableOpacity style={styles.statusButton} onPress={()=>change('active')}><Text style={styles.statusText}>بازگرداندن به فایل فعال</Text></TouchableOpacity>
+    <TouchableOpacity style={styles.depositButton} onPress={()=>change('deposit')}><Text style={styles.statusText}>ثبت بیعانه</Text></TouchableOpacity>
+    <TouchableOpacity style={styles.soldButton} onPress={()=>setSaleModal(true)}><Text style={styles.statusText}>ثبت فروش و انتخاب مشاور فروشنده</Text></TouchableOpacity>
+    <TouchableOpacity style={styles.deleteButton} onPress={remove}><Text style={styles.statusText}>حذف فایل</Text></TouchableOpacity>
+   </View>}
+  </ScrollView>
+  <Modal visible={saleModal} transparent animationType="fade" onRequestClose={()=>setSaleModal(false)}><View style={styles.overlay}><View style={styles.modal}><Text style={styles.modalTitle}>این ملک توسط کدام مشاور فروخته شد؟</Text><ScrollView style={{maxHeight:300}}>{consultants.map(c=><TouchableOpacity key={c.id} style={styles.person} onPress={()=>change('sold',c.id)}><Text style={styles.personText}>{c.fullName}</Text><Text style={styles.personUser}>@{c.username}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity style={styles.statusButton} onPress={()=>setSaleModal(false)}><Text style={styles.statusText}>انصراف</Text></TouchableOpacity></View></View></Modal>
+ </SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  back: { color: colors.primary, fontSize: 15 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  content: { padding: spacing.lg },
-  loading: { color: colors.text, textAlign: 'center', marginTop: 40 },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'right',
-    marginBottom: 8,
-  },
-  badge: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    marginBottom: 12,
-  },
-  badgePub: { backgroundColor: 'rgba(34,197,94,0.2)' },
-  badgeDraft: { backgroundColor: 'rgba(245,158,11,0.2)' },
-  badgeText: { fontSize: 12, fontWeight: '600', color: colors.text },
-  price: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.primary,
-    textAlign: 'right',
-    marginBottom: 12,
-  },
-  metaRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 8,
-  },
-  meta: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  address: {
-    color: colors.textSecondary,
-    textAlign: 'right',
-    marginBottom: 16,
-    fontSize: 14,
-  },
-  section: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    textAlign: 'right',
-    marginBottom: 6,
-  },
-  desc: {
-    color: colors.textSecondary,
-    textAlign: 'right',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  views: {
-    color: colors.textMuted,
-    textAlign: 'right',
-    marginBottom: 24,
-  },
-  primaryBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  primaryBtnText: { color: colors.background, fontWeight: '700', fontSize: 16 },
-  secondaryBtn: {
-    backgroundColor: colors.surface,
-    paddingVertical: 14,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 10,
-  },
-  secondaryBtnText: { color: colors.text, fontWeight: '600', fontSize: 15 },
-});
+const styles=StyleSheet.create({container:{flex:1,backgroundColor:colors.background},header:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',padding:spacing.md,borderBottomWidth:1,borderColor:colors.border},back:{color:colors.primary},headerTitle:{color:colors.text,fontWeight:'800',fontSize:17},content:{padding:spacing.lg,paddingBottom:40},loading:{color:colors.text,textAlign:'center',marginTop:40},ribbon:{marginHorizontal:-24,marginTop:-24,marginBottom:18,padding:10},deposit:{backgroundColor:'#D6A21D'},sold:{backgroundColor:'#C93636'},ribbonText:{color:'#fff',fontWeight:'900',textAlign:'center'},title:{fontSize:22,fontWeight:'900',color:colors.text,textAlign:'right'},fileOwner:{color:colors.textSecondary,textAlign:'right',marginTop:7},price:{fontSize:20,fontWeight:'900',color:colors.primary,textAlign:'right',marginVertical:12},pricePerSqm:{fontSize:12,color:colors.textSecondary,textAlign:'right',marginTop:-6,marginBottom:12},meta:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},chip:{backgroundColor:colors.surface,paddingHorizontal:10,paddingVertical:6,borderRadius:10,color:colors.textSecondary,fontSize:12},section:{color:colors.text,fontWeight:'800',textAlign:'right',fontSize:15,marginTop:18,marginBottom:8},description:{color:colors.textSecondary,textAlign:'right',lineHeight:23},primary:{backgroundColor:colors.primary,borderRadius:12,padding:15,alignItems:'center',marginTop:18},primaryText:{color:colors.background,fontWeight:'900'},confidentialButton:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.primary,borderRadius:12,padding:14,alignItems:'center',marginTop:10},confidentialText:{color:colors.primary,fontWeight:'800'},privateCard:{backgroundColor:colors.surfaceElevated,borderWidth:1,borderColor:colors.border,borderRadius:14,padding:14,marginTop:12},privateTitle:{color:colors.primary,fontWeight:'900',textAlign:'right',marginBottom:8},info:{flexDirection:'row-reverse',justifyContent:'space-between',paddingVertical:8,borderBottomWidth:1,borderColor:colors.border},infoLabel:{color:colors.textMuted,fontSize:12},infoValue:{color:colors.text,fontSize:13,fontWeight:'700',maxWidth:'62%',textAlign:'right'},mapButton:{backgroundColor:colors.primarySoft,padding:12,borderRadius:10,marginTop:12,alignItems:'center'},mapButtonText:{color:colors.primary,fontWeight:'800',textAlign:'center'},managerActions:{marginTop:18,backgroundColor:colors.surface,borderRadius:14,padding:14},statusButton:{backgroundColor:colors.surfaceLight,borderRadius:10,padding:13,alignItems:'center',marginTop:8},depositButton:{backgroundColor:'#D6A21D',borderRadius:10,padding:13,alignItems:'center',marginTop:8},soldButton:{backgroundColor:'#C93636',borderRadius:10,padding:13,alignItems:'center',marginTop:8},deleteButton:{backgroundColor:'#7F1D1D',borderRadius:10,padding:13,alignItems:'center',marginTop:8},statusText:{color:'#fff',fontWeight:'800'},overlay:{flex:1,backgroundColor:'rgba(0,0,0,.7)',justifyContent:'center',padding:22},modal:{backgroundColor:colors.surfaceElevated,borderRadius:18,padding:18},modalTitle:{color:colors.text,fontSize:16,fontWeight:'900',textAlign:'right',marginBottom:12},person:{flexDirection:'row-reverse',justifyContent:'space-between',padding:12,borderBottomWidth:1,borderColor:colors.border},personText:{color:colors.text,fontWeight:'700'},personUser:{color:colors.textMuted}});

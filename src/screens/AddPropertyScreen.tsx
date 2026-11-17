@@ -1,327 +1,65 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
-import { colors, spacing, borderRadius } from '../theme';
-import { api } from '../services/api';
-
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'AddProperty'>;
-};
-
-export default function AddPropertyScreen({ navigation }: Props) {
-  const [title, setTitle] = useState('');
-  const [city, setCity] = useState('');
-  const [address, setAddress] = useState('');
-  const [price, setPrice] = useState('');
-  const [area, setArea] = useState('');
-  const [rooms, setRooms] = useState('');
-  const [floor, setFloor] = useState('');
-  const [description, setDescription] = useState('');
-  const [panoramaUri, setPanoramaUri] = useState<string | null>(null);
-  const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('دسترسی', 'برای آپلود تصویر نیاز به دسترسی گالری است.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setPanoramaUri(result.assets[0].uri);
-    }
-  };
-
-  const pickVideo = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('دسترسی', 'برای آپلود ویدیو نیاز به دسترسی گالری است.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setVideoUri(result.assets[0].uri);
-    }
-  };
-
-  const handleSave = async (asDraft: boolean) => {
-    if (!title.trim() || !city.trim()) {
-      Alert.alert('خطا', 'عنوان و شهر الزامی است.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const payload = {
-        title: title.trim(),
-        city: city.trim(),
-        address: address.trim(),
-        price: Number(price) || 0,
-        area: Number(area) || 0,
-        rooms: Number(rooms) || 0,
-        floor: Number(floor) || 0,
-        description: description.trim(),
-        status: asDraft ? ('draft' as const) : ('published' as const),
-        panoramaUri: panoramaUri || undefined,
-        videoUri: videoUri || undefined,
-      };
-      await api.createProperty(payload);
-      Alert.alert('موفق', asDraft ? 'ملک به‌عنوان پیش‌نویس ذخیره شد.' : 'ملک منتشر شد.', [
-        { text: 'باشه', onPress: () => navigation.goBack() },
-      ]);
-    } catch {
-      // دمو
-      Alert.alert('موفق (دمو)', 'ملک در حالت دمو ذخیره شد.', [
-        { text: 'باشه', onPress: () => navigation.goBack() },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← بازگشت</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>افزودن ملک جدید</Text>
-        <View style={{ width: 60 }} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>عنوان ملک *</Text>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-          placeholder="مثال: آپارتمان ۲ خوابه نیاوران"
-          placeholderTextColor={colors.textMuted}
-          textAlign="right"
-        />
-
-        <Text style={styles.label}>شهر *</Text>
-        <TextInput
-          style={styles.input}
-          value={city}
-          onChangeText={setCity}
-          placeholder="تهران"
-          placeholderTextColor={colors.textMuted}
-          textAlign="right"
-        />
-
-        <Text style={styles.label}>آدرس</Text>
-        <TextInput
-          style={styles.input}
-          value={address}
-          onChangeText={setAddress}
-          placeholder="خیابان، کوچه، پلاک"
-          placeholderTextColor={colors.textMuted}
-          textAlign="right"
-        />
-
-        <View style={styles.row}>
-          <View style={styles.half}>
-            <Text style={styles.label}>قیمت (تومان)</Text>
-            <TextInput
-              style={styles.input}
-              value={price}
-              onChangeText={setPrice}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              textAlign="right"
-            />
-          </View>
-          <View style={styles.half}>
-            <Text style={styles.label}>متراژ (متر)</Text>
-            <TextInput
-              style={styles.input}
-              value={area}
-              onChangeText={setArea}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              textAlign="right"
-            />
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <View style={styles.half}>
-            <Text style={styles.label}>تعداد اتاق</Text>
-            <TextInput
-              style={styles.input}
-              value={rooms}
-              onChangeText={setRooms}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              textAlign="right"
-            />
-          </View>
-          <View style={styles.half}>
-            <Text style={styles.label}>طبقه</Text>
-            <TextInput
-              style={styles.input}
-              value={floor}
-              onChangeText={setFloor}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              textAlign="right"
-            />
-          </View>
-        </View>
-
-        <Text style={styles.label}>توضیحات</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="ویژگی‌های ملک را بنویسید..."
-          placeholderTextColor={colors.textMuted}
-          multiline
-          numberOfLines={4}
-          textAlign="right"
-          textAlignVertical="top"
-        />
-
-        <Text style={styles.section}>رسانه تور مجازی</Text>
-
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-          <Text style={styles.uploadText}>
-            {panoramaUri ? '✓ تصویر پانوراما انتخاب شد' : '📷 آپلود تصویر پانورامای ۳۶۰'}
-          </Text>
-        </TouchableOpacity>
-        {panoramaUri && (
-          <Image source={{ uri: panoramaUri }} style={styles.preview} resizeMode="cover" />
-        )}
-
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickVideo}>
-          <Text style={styles.uploadText}>
-            {videoUri ? '✓ ویدیو اسکن انتخاب شد' : '🎬 آپلود ویدیوی اسکن خانه'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnPrimary]}
-            onPress={() => handleSave(false)}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={styles.btnPrimaryText}>انتشار ملک</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnSecondary]}
-            onPress={() => handleSave(true)}
-            disabled={loading}
-          >
-            <Text style={styles.btnSecondaryText}>ذخیره پیش‌نویس</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+import React,{useEffect,useState}from'react';
+import{View,Text,StyleSheet,TextInput,TouchableOpacity,ScrollView,Alert,ActivityIndicator,Modal,Image}from'react-native';
+import{SafeAreaView}from'react-native-safe-area-context';
+import{NativeStackNavigationProp}from'@react-navigation/native-stack';
+import{RouteProp}from'@react-navigation/native';
+import*as ImagePicker from'expo-image-picker';
+import{RootStackParamList}from'../types';import{colors,spacing}from'../theme';import{api,Consultant,AppUser,Property}from'../services/api';import{getUser}from'../utils/storage';
+type Props={navigation:NativeStackNavigationProp<RootStackParamList,'AddProperty'>;route:RouteProp<RootStackParamList,'AddProperty'>};
+const Field=({label,value,onChangeText,placeholder,keyboardType,multiline}:{label:string;value:string;onChangeText:(v:string)=>void;placeholder?:string;keyboardType?:any;multiline?:boolean})=><View style={{marginBottom:9}}><Text style={styles.label}>{label}</Text><TextInput style={[styles.input,multiline&&{minHeight:85,textAlignVertical:'top'}]} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboardType||'default'} multiline={multiline} textAlign="right"/></View>;
+export default function AddPropertyScreen({navigation,route}:Props){
+ const propertyId=route.params?.propertyId;
+ const[user,setUser]=useState<AppUser|null>(null),[consultants,setConsultants]=useState<Consultant[]>([]),[selected,setSelected]=useState<Consultant|null>(null),[showOwners,setShowOwners]=useState(false),[loading,setLoading]=useState(false);
+ const[title,setTitle]=useState(''),[city,setCity]=useState('تهران'),[neighborhood,setNeighborhood]=useState(''),[address,setAddress]=useState(''),[exactAddress,setExactAddress]=useState(''),[propertyType,setPropertyType]=useState('آپارتمان');
+ const[price,setPrice]=useState(''),[realPrice,setRealPrice]=useState(''),[area,setArea]=useState(''),[rooms,setRooms]=useState(''),[floor,setFloor]=useState(''),[yearBuilt,setYearBuilt]=useState(''),[ownerName,setOwnerName]=useState(''),[ownerPhone,setOwnerPhone]=useState(''),[description,setDescription]=useState(''),[amenities,setAmenities]=useState('');
+ const[latitude,setLatitude]=useState<number|null>(route.params?.latitude??null),[longitude,setLongitude]=useState<number|null>(route.params?.longitude??null);
+ const[photoAssets,setPhotoAssets]=useState<any[]>([]),[panoramaAssets,setPanoramaAssets]=useState<any[]>([]),[currentFileOwnerId,setCurrentFileOwnerId]=useState<string|null>(null);
+ useEffect(()=>{if(route.params?.latitude!==undefined&&route.params?.longitude!==undefined){setLatitude(route.params.latitude);setLongitude(route.params.longitude);}},[route.params?.latitude,route.params?.longitude]);
+ useEffect(()=>{(async()=>{const u=await getUser<AppUser>();setUser(u);if(u?.role!=='owner'&&u?.role!=='manager'){Alert.alert('عدم دسترسی','ثبت و ویرایش فایل فقط برای مدیریت دفتر فعال است.');navigation.goBack();return;}
+  const team=(await api.getConsultants()).filter(x=>x.status==='active');setConsultants(team);
+  if(propertyId){const p:Property=await api.getProperty(propertyId);setTitle(p.title);setCity(p.city);setNeighborhood(p.neighborhood||'');setAddress(p.address);setExactAddress(p.exact_address||'');setPropertyType(p.property_type||'آپارتمان');setPrice(String(p.price||''));setRealPrice(p.real_price==null?'':String(p.real_price));setArea(String(p.area||''));setRooms(String(p.rooms||''));setFloor(String(p.floor||''));setYearBuilt(p.year_built?String(p.year_built):'');setOwnerName(p.owner_name||'');setOwnerPhone(p.owner_phone||'');setDescription(p.description||'');setLatitude(p.latitude??null);setLongitude(p.longitude??null);setCurrentFileOwnerId(p.file_owner_id);setSelected(team.find(x=>x.id===p.file_owner_id)||null);setAmenities((p.amenities||[]).join('، '));}
+  else if(team.length)setSelected(team[0]);
+ })().catch(e=>Alert.alert('خطا',e.message));},[propertyId]);
+ const pickAssets=async(kind:'photos'|'panoramas')=>{const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();if(permission.status!=='granted'){Alert.alert('دسترسی گالری','برای انتخاب تصاویر ملک اجازه دسترسی لازم است.');return;}
+  const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:ImagePicker.MediaTypeOptions.Images,allowsMultipleSelection:true,allowsEditing:false,quality:1});
+  if(!result.canceled&&result.assets.length){if(kind==='photos')setPhotoAssets(p=>[...p,...result.assets]);else setPanoramaAssets(p=>[...p,...result.assets]);}
+ };
+ const save=async(draft:boolean)=>{
+  if(!title.trim()||!city.trim()||!price.trim()||!area.trim()){Alert.alert('اطلاعات ناقص','عنوان، شهر، قیمت و متراژ الزامی هستند.');return;}
+  if(!selected&&!user){Alert.alert('مشاور فایل','مشاور صاحب فایل را انتخاب کنید.');return;}
+  setLoading(true);
+  const body:any={title:title.trim(),city:city.trim(),address:address.trim(),price:Number(price),real_price:realPrice?Number(realPrice):null,area:Number(area),rooms:Number(rooms)||0,floor:Number(floor)||0,description:description.trim(),status:draft?'draft':'published',file_owner_id:selected?.id||currentFileOwnerId||user!.id,owner_name:ownerName.trim()||null,owner_phone:ownerPhone.trim()||null,exact_address:exactAddress.trim()||null,neighborhood:neighborhood.trim()||null,property_type:propertyType,year_built:yearBuilt?Number(yearBuilt):null,amenities:amenities.split(/[،,]/).map(x=>x.trim()).filter(Boolean),latitude,longitude};
+  try{
+   const saved=propertyId?await api.updateProperty(propertyId,body):await api.createProperty({title:body.title,city:body.city,address:body.address,price:body.price,realPrice:body.real_price,area:body.area,rooms:body.rooms,floor:body.floor,description:body.description,status:body.status,fileOwnerId:body.file_owner_id,ownerName:body.owner_name,ownerPhone:body.owner_phone,exactAddress:body.exact_address,neighborhood:body.neighborhood,propertyType:body.property_type,yearBuilt:body.year_built,amenities:body.amenities,latitude,longitude});
+   if(!saved)throw new Error('فایل ذخیره نشد.');
+   if(photoAssets.length)await api.uploadPropertyPhotos(saved.id,photoAssets);
+   if(panoramaAssets.length)await api.uploadTourScenes(saved.id,panoramaAssets);
+   Alert.alert('ثبت شد',propertyId?'تغییرات فایل ذخیره شد.':draft?'فایل و رسانه‌ها به‌صورت پیش‌نویس ذخیره شدند.':'فایل و رسانه‌ها با موفقیت ثبت شدند.',[{text:'باشه',onPress:()=>navigation.goBack()}]);
+  }catch(e:any){Alert.alert('ذخیره ناموفق بود',e.message||'خطا در ذخیره اطلاعات یا آپلود تصاویر.');}finally{setLoading(false);}
+ };
+ return <SafeAreaView style={styles.container}>
+  <View style={styles.header}><TouchableOpacity onPress={()=>navigation.goBack()}><Text style={styles.back}>بازگشت</Text></TouchableOpacity><Text style={styles.headerTitle}>{propertyId?'ویرایش فایل':'ثبت فایل جدید'}</Text><View style={{width:48}}/></View>
+  <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+   <Text style={styles.section}>مشخصات فایل</Text><Field label="عنوان ملک *" value={title} onChangeText={setTitle} placeholder="مثلاً آپارتمان ۱۲۰ متری"/>
+   <View style={styles.row}><View style={{flex:1}}><Field label="شهر *" value={city} onChangeText={setCity}/></View><View style={{flex:1}}><Field label="محله" value={neighborhood} onChangeText={setNeighborhood}/></View></View>
+   <View style={styles.row}><View style={{flex:1}}><Field label="نوع ملک" value={propertyType} onChangeText={setPropertyType}/></View><View style={{flex:1}}><Field label="سال ساخت" value={yearBuilt} onChangeText={setYearBuilt} keyboardType="numeric"/></View></View>
+   <Field label="آدرس قابل نمایش در آگهی" value={address} onChangeText={setAddress}/>
+   <View style={styles.row}><View style={{flex:1}}><Field label="قیمت آگهی (تومان) *" value={price} onChangeText={setPrice} keyboardType="numeric"/></View><View style={{flex:1}}><Field label="متراژ *" value={area} onChangeText={setArea} keyboardType="numeric"/></View></View>
+   <View style={styles.row}><View style={{flex:1}}><Field label="قیمت واقعی (تومان)" value={realPrice} onChangeText={setRealPrice} keyboardType="numeric"/></View><View style={{flex:1}}><Field label="تعداد خواب" value={rooms} onChangeText={setRooms} keyboardType="numeric"/></View><View style={{flex:1}}><Field label="طبقه" value={floor} onChangeText={setFloor} keyboardType="numeric"/></View></View>
+   <Text style={styles.section}>مالکیت فایل</Text><Text style={styles.label}>این فایل متعلق به کدام مشاور است؟</Text><TouchableOpacity style={styles.select} onPress={()=>setShowOwners(true)}><Text style={styles.selectText}>{selected?.fullName||'انتخاب مشاور'}</Text><Text style={styles.selectArrow}>⌄</Text></TouchableOpacity>
+   <Text style={styles.section}>اطلاعات اختصاصی دفتر</Text><Field label="نام مالک / فروشنده" value={ownerName} onChangeText={setOwnerName}/><Field label="شماره تماس مالک" value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad"/><Field label="آدرس دقیق ملک (اختصاصی)" value={exactAddress} onChangeText={setExactAddress}/>
+   <TouchableOpacity style={styles.mapButton} onPress={()=>navigation.navigate('MapPicker',{latitude:latitude??undefined,longitude:longitude??undefined,propertyId})}><Text style={styles.mapText}>{latitude!==null&&longitude!==null?'✓ موقعیت دقیق ثبت شده · تغییر موقعیت':'📍 انتخاب موقعیت دقیق روی نقشه'}</Text></TouchableOpacity>
+   {latitude!==null&&longitude!==null&&<Text style={styles.coords}>{latitude.toFixed(6)} , {longitude.toFixed(6)}</Text>}
+   <Text style={styles.section}>تصاویر و تور مجازی</Text>
+   <TouchableOpacity style={styles.upload} onPress={()=>pickAssets('photos')}><Text style={styles.uploadText}>انتخاب تصاویر عادی ملک ({photoAssets.length})</Text></TouchableOpacity>
+   <TouchableOpacity style={styles.upload} onPress={()=>pickAssets('panoramas')}><Text style={styles.uploadText}>انتخاب تصاویر پانورامای ۳۶۰ ({panoramaAssets.length})</Text></TouchableOpacity>
+   <Text style={styles.hint}>برای تور راهنمایی‌شده، تصاویر پانورامای اتاق‌ها را به ترتیب انتخاب کنید؛ هر تصویر یک بخش تور می‌شود.</Text>
+   <View style={styles.previewRow}>{photoAssets.slice(0,4).map((a,i)=><Image key={'p'+i} source={{uri:a.uri}} style={styles.preview}/>)}</View>
+   <Field label="امکانات (با ویرگول جدا کنید)" value={amenities} onChangeText={setAmenities} placeholder="پارکینگ، آسانسور، انباری..."/>
+   <Field label="توضیحات" value={description} onChangeText={setDescription} multiline/>
+   <View style={styles.actions}><TouchableOpacity style={styles.primary} onPress={()=>save(false)} disabled={loading}>{loading?<ActivityIndicator color={colors.background}/>:<Text style={styles.primaryText}>{propertyId?'ذخیره تغییرات':'ثبت فایل'}</Text>}</TouchableOpacity>{!propertyId&&<TouchableOpacity style={styles.secondary} onPress={()=>save(true)} disabled={loading}><Text style={styles.secondaryText}>ذخیره پیش‌نویس</Text></TouchableOpacity>}</View>
+  </ScrollView>
+  <Modal visible={showOwners} transparent animationType="fade" onRequestClose={()=>setShowOwners(false)}><View style={styles.modalOverlay}><View style={styles.modal}><Text style={styles.modalTitle}>انتخاب صاحب فایل</Text><ScrollView style={{maxHeight:330}}>{consultants.map(c=><TouchableOpacity key={c.id} style={styles.person} onPress={()=>{setSelected(c);setShowOwners(false)}}><Text style={styles.personName}>{c.fullName}</Text><Text style={styles.personUser}>@{c.username}</Text></TouchableOpacity>)}{consultants.length===0&&<Text style={styles.empty}>هنوز مشاور فعالی برای این دفتر ثبت نشده است.</Text>}</ScrollView><TouchableOpacity style={styles.secondary} onPress={()=>setShowOwners(false)}><Text style={styles.secondaryText}>بستن</Text></TouchableOpacity></View></View></Modal>
+ </SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  back: { color: colors.primary, fontSize: 15 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  form: { padding: spacing.lg, paddingBottom: 40 },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'right',
-    marginBottom: 6,
-    marginTop: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: colors.border,
-    writingDirection: 'rtl',
-  },
-  textarea: { minHeight: 100 },
-  row: { flexDirection: 'row-reverse', gap: spacing.sm },
-  half: { flex: 1 },
-  section: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    textAlign: 'right',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  uploadBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  uploadText: { color: colors.primary, fontSize: 14 },
-  preview: {
-    width: '100%',
-    height: 160,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
-  },
-  actions: { marginTop: spacing.xl, gap: spacing.sm },
-  btn: {
-    paddingVertical: 16,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-  },
-  btnPrimary: { backgroundColor: colors.primary },
-  btnPrimaryText: { color: colors.background, fontWeight: '700', fontSize: 16 },
-  btnSecondary: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  btnSecondaryText: { color: colors.text, fontWeight: '600', fontSize: 15 },
-});
+const styles=StyleSheet.create({container:{flex:1,backgroundColor:colors.background},header:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',padding:spacing.md,borderBottomWidth:1,borderColor:colors.border},back:{color:colors.primary},headerTitle:{color:colors.text,fontSize:17,fontWeight:'800'},form:{padding:spacing.lg,paddingBottom:40},section:{color:colors.primary,fontSize:15,fontWeight:'800',textAlign:'right',marginTop:12,marginBottom:8},label:{color:colors.textSecondary,fontSize:12,textAlign:'right',marginBottom:5},input:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:11,padding:12,color:colors.text,writingDirection:'rtl'},row:{flexDirection:'row-reverse',gap:8},select:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:11,padding:14,flexDirection:'row-reverse',justifyContent:'space-between'},selectText:{color:colors.text,fontWeight:'700'},selectArrow:{color:colors.primary},mapButton:{backgroundColor:colors.primarySoft,borderWidth:1,borderColor:colors.primary,borderRadius:12,padding:14,alignItems:'center',marginVertical:8},mapText:{color:colors.primary,fontWeight:'800'},coords:{color:colors.textMuted,textAlign:'center',fontSize:11},upload:{backgroundColor:colors.surface,borderWidth:1,borderStyle:'dashed',borderColor:colors.primary,borderRadius:11,padding:13,alignItems:'center',marginBottom:8},uploadText:{color:colors.primary,fontWeight:'800'},hint:{color:colors.textMuted,fontSize:11,textAlign:'right',lineHeight:18,marginBottom:8},previewRow:{flexDirection:'row-reverse',gap:6,marginBottom:10},preview:{width:68,height:68,borderRadius:8},actions:{gap:10,marginTop:18},primary:{backgroundColor:colors.primary,borderRadius:12,padding:15,alignItems:'center'},primaryText:{color:colors.background,fontWeight:'900'},secondary:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:12,padding:14,alignItems:'center'},secondaryText:{color:colors.text,fontWeight:'700'},modalOverlay:{flex:1,backgroundColor:'rgba(0,0,0,.7)',justifyContent:'center',padding:24},modal:{backgroundColor:colors.surfaceElevated,borderRadius:18,padding:18},modalTitle:{color:colors.text,fontWeight:'900',fontSize:17,textAlign:'right',marginBottom:12},person:{padding:12,borderBottomWidth:1,borderColor:colors.border,flexDirection:'row-reverse',justifyContent:'space-between'},personName:{color:colors.text,fontWeight:'700'},personUser:{color:colors.textMuted},empty:{color:colors.textMuted,textAlign:'center',padding:18}});

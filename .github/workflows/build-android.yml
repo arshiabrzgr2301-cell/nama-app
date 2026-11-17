@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/office-crm-operations
   workflow_dispatch:
     inputs:
       build_type:
@@ -25,41 +26,33 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dkotlin.compiler.execution.strategy=in-process
       CI: true
       BUILD_TYPE: ${{ github.event.inputs.build_type || 'both' }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
       - name: Setup Node.js 20
         uses: actions/setup-node@v5
         with:
           node-version: '20'
-
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
-
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-          echo "Dependencies installed successfully"
-
+        run: npm install --legacy-peer-deps
+      - name: Validate TypeScript
+        run: npx tsc --noEmit
       - name: Create placeholder assets
         run: |
           mkdir -p assets
           python3 << 'PY'
           import struct, zlib
-
           def create_png(path, w, h, r, g, b):
               def chunk(tag, data):
                   return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
@@ -67,42 +60,23 @@ jobs:
               raw = row * h
               ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
               data = chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw, 1)) + chunk(b'IEND', b'')
-              with open(path, 'wb') as f:
-                  f.write(b'\x89PNG\r\n\x1a\n' + data)
-              print(path, w, h, 'ok')
-
+              with open(path, 'wb') as f: f.write(b'\x89PNG\r\n\x1a\n' + data)
           create_png('assets/icon.png', 512, 512, 34, 211, 238)
           create_png('assets/splash.png', 512, 512, 15, 23, 42)
           create_png('assets/adaptive-icon.png', 512, 512, 34, 211, 238)
           create_png('assets/favicon.png', 48, 48, 34, 211, 238)
-          print('Placeholder assets created')
           PY
-          ls -lh assets/
-
       - name: Prebuild Android project
-        run: |
-          npx expo prebuild --platform android --no-install
-          echo "Expo prebuild completed"
-
-      - name: Embed JS bundle (standalone APK without Metro)
+        run: npx expo prebuild --platform android --no-install
+      - name: Embed JS bundle
         run: |
           mkdir -p android/app/src/main/assets
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res \
-            --reset-cache
-          ls -lh android/app/src/main/assets/index.android.bundle
-          echo "JS bundle embedded"
-
-      - name: Prepare signing (release)
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --reset-cache
+      - name: Prepare signing
         id: signing
         run: |
           mkdir -p android/app
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "Using release keystore from GitHub Secrets"
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/nama-release.keystore
             echo "STORE_FILE=$GITHUB_WORKSPACE/android/app/nama-release.keystore" >> $GITHUB_ENV
             echo "STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
@@ -110,16 +84,9 @@ jobs:
             echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
             echo "mode=release-keystore" >> $GITHUB_OUTPUT
           else
-            echo "No ANDROID_KEYSTORE_BASE64 secret — release will be signed with Android debug keystore (OK for testing, not for stores)"
             mkdir -p $HOME/.android
             if [ ! -f $HOME/.android/debug.keystore ]; then
-              keytool -genkeypair -v \
-                -keystore $HOME/.android/debug.keystore \
-                -storepass android \
-                -alias androiddebugkey \
-                -keypass android \
-                -keyalg RSA -keysize 2048 -validity 10000 \
-                -dname "CN=Android Debug,O=Android,C=US"
+              keytool -genkeypair -v -keystore $HOME/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             fi
             echo "STORE_FILE=$HOME/.android/debug.keystore" >> $GITHUB_ENV
             echo "STORE_PASSWORD=android" >> $GITHUB_ENV
@@ -127,82 +94,33 @@ jobs:
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
             echo "mode=debug-keystore" >> $GITHUB_OUTPUT
           fi
-
       - name: Build Debug APK
         if: env.BUILD_TYPE == 'both' || env.BUILD_TYPE == 'debug'
         working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace --no-daemon
-          echo "Debug build finished"
-
+        run: chmod +x gradlew && ./gradlew assembleDebug --stacktrace --no-daemon
       - name: Build Release APK
         if: env.BUILD_TYPE == 'both' || env.BUILD_TYPE == 'release'
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace --no-daemon \
-            -Pandroid.injected.signing.store.file="$STORE_FILE" \
-            -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-          echo "Release build finished"
-
+          ./gradlew assembleRelease --stacktrace --no-daemon -Pandroid.injected.signing.store.file="$STORE_FILE" -Pandroid.injected.signing.store.password="$STORE_PASSWORD" -Pandroid.injected.signing.key.alias="$KEY_ALIAS" -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
       - name: Collect APKs
         run: |
           mkdir -p dist
           DEBUG_APK=$(find android -name "*.apk" -path "*/debug/*" 2>/dev/null | head -n 1 || true)
           RELEASE_APK=$(find android -name "*.apk" -path "*/release/*" 2>/dev/null | head -n 1 || true)
-
-          if [ -n "$DEBUG_APK" ]; then
-            cp "$DEBUG_APK" dist/nama-debug.apk
-            echo "Debug APK: $DEBUG_APK"
-            ls -lh dist/nama-debug.apk
-          fi
-
-          if [ -n "$RELEASE_APK" ]; then
-            cp "$RELEASE_APK" dist/nama-release.apk
-            echo "Release APK: $RELEASE_APK"
-            ls -lh dist/nama-release.apk
-          fi
-
-          if [ ! -f dist/nama-debug.apk ] && [ ! -f dist/nama-release.apk ]; then
-            echo "ERROR: No APK produced"
-            find android -name "*.apk" || true
-            exit 1
-          fi
-
-      - name: Upload Debug APK
-        if: hashFiles('dist/nama-debug.apk') != ''
+          if [ -n "$DEBUG_APK" ]; then cp "$DEBUG_APK" dist/nama-debug.apk; fi
+          if [ -n "$RELEASE_APK" ]; then cp "$RELEASE_APK" dist/nama-release.apk; fi
+          if [ ! -f dist/nama-debug.apk ] && [ ! -f dist/nama-release.apk ]; then echo "ERROR: No APK produced"; exit 1; fi
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: NAMA-Debug-APK
-          path: dist/nama-debug.apk
+          name: NAMA-APK
+          path: dist/*.apk
           retention-days: 30
-
-      - name: Upload Release APK
-        if: hashFiles('dist/nama-release.apk') != ''
-        uses: actions/upload-artifact@v6
-        with:
-          name: NAMA-Release-APK
-          path: dist/nama-release.apk
-          retention-days: 30
-
       - name: Build summary
         if: always()
         run: |
-          echo "========================================"
           echo "NAMA Android Build Summary"
-          echo "========================================"
-          echo "Build type input: $BUILD_TYPE"
-          echo "Signing mode: ${{ steps.signing.outputs.mode }}"
-          ls -lh dist/ 2>/dev/null || echo "No dist files"
-          if [ "${{ steps.signing.outputs.mode }}" = "debug-keystore" ]; then
-            echo ""
-            echo "NOTE: Release APK was signed with the DEBUG keystore."
-            echo "For CafeBazaar / Play Store, add these GitHub Secrets:"
-            echo "  ANDROID_KEYSTORE_BASE64"
-            echo "  ANDROID_KEYSTORE_PASSWORD"
-            echo "  ANDROID_KEY_ALIAS"
-            echo "  ANDROID_KEY_PASSWORD"
-          fi
+          echo "Build type: $BUILD_TYPE"
+          ls -lh dist/ 2>/dev/null || true
