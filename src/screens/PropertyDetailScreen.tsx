@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Linking, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -12,8 +12,8 @@ const isManager=(r?:string)=>r==='owner'||r==='manager';
 const money=(n?:number|null)=>n==null?'—':Number(n).toLocaleString('fa-IR')+' تومان';
 function Info({label,value}:{label:string;value?:string|null}){return <View style={styles.info}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value||'ثبت نشده'}</Text></View>}
 export default function PropertyDetailScreen({navigation,route}:Props){
- const {id}=route.params;const [property,setProperty]=useState<Property|null>(null),[user,setUser]=useState<AppUser|null>(null),[consultants,setConsultants]=useState<Consultant[]>([]),[privateVisible,setPrivateVisible]=useState(false),[saleModal,setSaleModal]=useState(false);
- const load=async()=>{const [p,u,c]=await Promise.all([api.getProperty(id),getUser<AppUser>(),api.getConsultants()]);setProperty(p);setUser(u);setConsultants(c);};
+ const {id}=route.params;const [property,setProperty]=useState<Property|null>(null),[user,setUser]=useState<AppUser|null>(null),[consultants,setConsultants]=useState<Consultant[]>([]),[photos,setPhotos]=useState<any[]>([]),[privateVisible,setPrivateVisible]=useState(false),[saleModal,setSaleModal]=useState(false);
+ const load=async()=>{const [p,u,c,media]=await Promise.all([api.getProperty(id),getUser<AppUser>(),api.getConsultants(),api.getPropertyPhotos(id)]);setProperty(p);setUser(u);setConsultants(c);setPhotos(media);};
  useEffect(()=>{load().catch(e=>Alert.alert('خطا',e.message));},[id]);
  if(!property)return <SafeAreaView style={styles.container}><Text style={styles.loading}>در حال بارگذاری فایل...</Text></SafeAreaView>;
  const fileOwner=consultants.find(c=>c.id===property.file_owner_id),soldBy=consultants.find(c=>c.id===property.sold_by_consultant_id);
@@ -26,6 +26,7 @@ export default function PropertyDetailScreen({navigation,route}:Props){
    {property.deal_status!=='active'&&<View style={[styles.ribbon,property.deal_status==='sold'?styles.sold:styles.deposit]}><Text style={styles.ribbonText}>{property.deal_status==='sold'?'فروخته شد'+(soldBy?' توسط '+soldBy.fullName:''):'بیعانه شد'}</Text></View>}
    <Text style={styles.title}>{property.title}</Text><Text style={styles.fileOwner}>فایل {fileOwner?.fullName||(property.file_owner_id===user?.id?user?.name:'مشاور دفتر')}</Text>
    <Text style={styles.price}>{money(Number(property.price))}</Text><View style={styles.meta}>{[property.city,property.neighborhood||property.address,property.area+' متر',property.rooms+' خواب','طبقه '+property.floor].map((v,i)=><Text key={i} style={styles.chip}>{v}</Text>)}</View>
+   {!!photos.length&&<><Text style={styles.section}>تصاویر ملک</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:8}}>{photos.filter(x=>x.url).map((photo,i)=><Image key={photo.id||i} source={{uri:photo.url}} style={{width:220,height:160,borderRadius:12}} resizeMode="cover"/>)}</ScrollView></>}
    <Text style={styles.section}>توضیحات</Text><Text style={styles.description}>{property.description||'توضیحی ثبت نشده است.'}</Text>
    <TouchableOpacity style={styles.primary} onPress={()=>navigation.navigate('TourViewer',{id:property.id})}><Text style={styles.primaryText}>مشاهده تور ۳۶۰ داخلی</Text></TouchableOpacity>
    <TouchableOpacity style={styles.confidentialButton} onPress={()=>setPrivateVisible(v=>!v)}><Text style={styles.confidentialText}>{privateVisible?'مخفی‌کردن اطلاعات اختصاصی':'🔒 نمایش اطلاعات اختصاصی دفتر'}</Text></TouchableOpacity>
