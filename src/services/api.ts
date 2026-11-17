@@ -100,7 +100,7 @@ export const api = {
   if(!members.length)return[];const ids=members.map(x=>x.user_id).join(',');const profiles=await request<any[]>('profiles?select=user_id,username,full_name&user_id=in.('+ids+')');
   return members.map(m=>{const p=profiles.find(x=>x.user_id===m.user_id);return{id:m.user_id,fullName:p?.full_name||p?.username||'مشاور',username:p?.username||'',status:m.status};});
  },
- updateConsultantStatus:async(userId:string,status:'active'|'inactive')=>{
+ updateConsultantStatus:async(userId:string,status:'active'|'suspended')=>{
   const u=await getUser<AppUser>();if(!u)throw new Error('نشست معتبر نیست.');
   const rows=await request<any[]>('organization_memberships?user_id=eq.'+encodeURIComponent(userId)+'&organization_id=eq.'+encodeURIComponent(u.organizationId)+'&select=*',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({status})});return rows[0];
  },
