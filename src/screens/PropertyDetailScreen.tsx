@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Linking, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Linking, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback } from 'react';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
@@ -13,12 +15,15 @@ const money=(n?:number|null)=>n==null?'—':Number(n).toLocaleString('fa-IR')+' 
 function Info({label,value}:{label:string;value?:string|null}){return <View style={styles.info}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value||'ثبت نشده'}</Text></View>}
 export default function PropertyDetailScreen({navigation,route}:Props){
  const {id}=route.params;const [property,setProperty]=useState<Property|null>(null),[user,setUser]=useState<AppUser|null>(null),[consultants,setConsultants]=useState<Consultant[]>([]),[photos,setPhotos]=useState<any[]>([]),[privateVisible,setPrivateVisible]=useState(false),[saleModal,setSaleModal]=useState(false);
+ useFocusEffect(useCallback(()=>()=>setPrivateVisible(false),[]));
  const load=async()=>{const [p,u,c,media]=await Promise.all([api.getProperty(id),getUser<AppUser>(),api.getConsultants(),api.getPropertyPhotos(id)]);setProperty(p);setUser(u);setConsultants(c);setPhotos(media);};
  useEffect(()=>{load().catch(e=>Alert.alert('خطا',e.message));},[id]);
  if(!property)return <SafeAreaView style={styles.container}><Text style={styles.loading}>در حال بارگذاری فایل...</Text></SafeAreaView>;
  const fileOwner=consultants.find(c=>c.id===property.file_owner_id),soldBy=consultants.find(c=>c.id===property.sold_by_consultant_id);
  const change=async(status:'active'|'deposit'|'sold',soldById?:string)=>{try{const p=await api.setDealStatus(id,status,soldById);setProperty(p);setSaleModal(false);Alert.alert('ثبت شد','وضعیت فایل به‌روزرسانی شد.');}catch(e:any){Alert.alert('خطا',e.message||'تغییر وضعیت انجام نشد.');}};
- const directions=async()=>{if(property.latitude==null||property.longitude==null){Alert.alert('موقعیت ثبت نشده','برای این فایل موقعیت دقیق ثبت نشده است.');return;}const uri='geo:'+property.latitude+','+property.longitude+'?q='+property.latitude+','+property.longitude;try{await Linking.openURL(uri);}catch{await Linking.openURL('https://www.google.com/maps/dir/?api=1&destination='+property.latitude+','+property.longitude);}};
+ const coordinates=property.latitude!=null&&property.longitude!=null?property.latitude+','+property.longitude:null;
+ const openNeshan=async()=>{if(!coordinates)return;const uri=Platform.OS==='ios'?'neshan://?destination='+coordinates:'https://nshn.ir?lat='+property.latitude+'&lng='+property.longitude;try{await Linking.openURL(uri);}catch{await Linking.openURL('https://neshan.org/maps/share/'+coordinates);}};
+ const openBalad=async()=>{if(!coordinates)return;const uri='geo:'+coordinates+'?q='+coordinates;try{await Linking.openURL(uri);}catch{await Linking.openURL('https://balad.ir');}};
  const remove=()=>Alert.alert('حذف فایل','این فایل برای همیشه حذف شود؟',[{text:'انصراف',style:'cancel'},{text:'حذف فایل',style:'destructive',onPress:async()=>{try{await api.deleteProperty(id);navigation.goBack();}catch(e:any){Alert.alert('حذف ناموفق',e.message);}}}]);
  return <SafeAreaView style={styles.container}>
   <View style={styles.header}><TouchableOpacity onPress={()=>navigation.goBack()}><Text style={styles.back}>بازگشت</Text></TouchableOpacity><Text style={styles.headerTitle}>جزئیات فایل</Text><View style={{width:48}}/></View>
@@ -32,7 +37,7 @@ export default function PropertyDetailScreen({navigation,route}:Props){
    <TouchableOpacity style={styles.confidentialButton} onPress={()=>setPrivateVisible(v=>!v)}><Text style={styles.confidentialText}>{privateVisible?'مخفی‌کردن اطلاعات اختصاصی':'🔒 نمایش اطلاعات اختصاصی دفتر'}</Text></TouchableOpacity>
    {privateVisible&&<View style={styles.privateCard}><Text style={styles.privateTitle}>اطلاعات اختصاصی دفتر</Text>
     <Info label="نام مالک / فروشنده" value={property.owner_name}/><Info label="شماره تماس مالک" value={property.owner_phone}/><Info label="آدرس دقیق ملک" value={property.exact_address}/><Info label="قیمت واقعی ملک" value={money(property.real_price??property.price)}/><Info label="تاریخ ثبت فایل" value={new Date(property.created_at).toLocaleDateString('fa-IR')}/>
-    {property.latitude!=null&&property.longitude!=null&&<TouchableOpacity style={styles.mapButton} onPress={directions}><Text style={styles.mapButtonText}>📍 مسیریابی به موقعیت دقیق ملک (بلد / نشان)</Text></TouchableOpacity>}
+    {property.latitude!=null&&property.longitude!=null&&<View style={{gap:8,marginTop:12}}><TouchableOpacity style={styles.mapButton} onPress={openNeshan}><Text style={styles.mapButtonText}>بازکردن موقعیت در نشان</Text></TouchableOpacity><TouchableOpacity style={styles.mapButton} onPress={openBalad}><Text style={styles.mapButtonText}>بازکردن موقعیت در بلد / انتخاب مسیریاب</Text></TouchableOpacity></View>}
    </View>}
    {isManager(user?.role)&&<View style={styles.managerActions}><Text style={styles.section}>مدیریت فایل</Text>
     <TouchableOpacity style={styles.statusButton} onPress={()=>navigation.navigate('AddProperty',{propertyId:id})}><Text style={styles.statusText}>ویرایش مشخصات فایل</Text></TouchableOpacity>
