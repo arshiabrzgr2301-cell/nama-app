@@ -29,7 +29,7 @@ jobs:
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dkotlin.compiler.execution.strategy=in-process
       CI: true
-      BUILD_TYPE: \${{ github.event.inputs.build_type || 'both' }}
+      BUILD_TYPE: ${{ github.event.inputs.build_type || 'both' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -76,12 +76,12 @@ jobs:
         id: signing
         run: |
           mkdir -p android/app
-          if [ -n "\${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "\${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/nama-release.keystore
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/nama-release.keystore
             echo "STORE_FILE=$GITHUB_WORKSPACE/android/app/nama-release.keystore" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=\${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-            echo "KEY_ALIAS=\${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=\${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
             echo "mode=release-keystore" >> $GITHUB_OUTPUT
           else
             mkdir -p $HOME/.android
@@ -123,5 +123,5 @@ jobs:
         run: |
           echo "NAMA Android Build Summary"
           echo "Build type: $BUILD_TYPE"
-          echo "Signing mode: \${{ steps.signing.outputs.mode }}"
+          echo "Signing mode: ${{ steps.signing.outputs.mode }}"
           ls -lh dist/ 2>/dev/null || true
