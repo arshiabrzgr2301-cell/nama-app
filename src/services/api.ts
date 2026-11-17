@@ -90,7 +90,7 @@ export const api = {
   const body:any={title:data.title,city:data.city,address:data.address,price:data.price,real_price:data.realPrice??null,area:data.area,rooms:data.rooms,floor:data.floor,description:data.description,status:data.status||'draft',owner_id:u.id,registered_by:u.id,organization_id:u.organizationId,file_owner_id:data.fileOwnerId||u.id,owner_name:data.ownerName||null,owner_phone:data.ownerPhone||null,exact_address:data.exactAddress||null,neighborhood:data.neighborhood||null,property_type:data.propertyType||null,year_built:data.yearBuilt||null,amenities:data.amenities||[],latitude:data.latitude??null,longitude:data.longitude??null};
   const rows=await request<Property[]>('properties?select=*',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(body)});return rows[0];
  },
- updateProperty:(id:string,data:Record<string,unknown>)=>request<Property[]>('properties?id=eq.'+encodeURIComponent(id)+'&select=*',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(data)}).then(rows=>rows[0]),
+ updateProperty:async(id:string,data:Record<string,unknown>)=>{const rows=await request<Property[]>('properties?id=eq.'+encodeURIComponent(id)+'&select=*',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(data)});if(!rows.length)throw new Error('فایل به‌روزرسانی نشد یا دسترسی ندارید.');return rows[0];},
  deleteProperty:(id:string)=>request<void>('properties?id=eq.'+encodeURIComponent(id),{method:'DELETE'}),
  publishProperty:(id:string)=>api.updateProperty(id,{status:'published'}),
  setDraft:(id:string)=>api.updateProperty(id,{status:'draft'}),
