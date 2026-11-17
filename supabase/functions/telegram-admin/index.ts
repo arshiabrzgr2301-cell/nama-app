@@ -153,6 +153,7 @@ async function officeDetail(chatId: number, id: string) {
     [{ text: "🔄 تمدید اشتراک", callback_data: `/renewoffice:${id}` }],
     [{ text: office.status === "active" ? "⛔ تعلیق دفتر" : "▶️ فعال‌سازی دفتر", callback_data: office.status === "active" ? `/confirmstop:${id}` : `/confirmactivate:${id}` }],
     [{ text: "🔑 بازیابی رمز مدیر", callback_data: `/resetoffice:${id}` }],
+    [{ text: "🗑 حذف کامل دفتر", callback_data: `/confirmdelete:${id}` }],
     [{ text: "⬅️ بازگشت به دفاتر", callback_data: "/orgs" }, { text: "🏠 منوی اصلی", callback_data: "/menu" }],
   ] };
   return send(chatId,
@@ -176,6 +177,49 @@ async function renewOffice(chatId: number, id: string, days: number) {
   });
   await db(`organizations?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status: "active" }) });
   await send(chatId, `✅ اشتراک «${offices[0].name}» تمدید شد.\nمدت: ${new Intl.NumberFormat("fa-IR").format(days)} روز\nانقضا: ${new Date(expires).toLocaleString("fa-IR", { timeZone: "Asia/Tehran" })}`);
+}
+async function deleteOffice(chatId: number, id: string) {
+  const offices = await db(`organizations?select=id,name&id=eq.${encodeURIComponent(id)}&limit=1`);
+  if (!offices.length) throw new Error("دفتر پیدا نشد یا قبلاً حذف شده است.");
+  const members = await db(`organization_memberships?select=user_id,role&organization_id=eq.${encodeURIComponent(id)}`);
+  const users = Array.from(new Set(members.map((m: any) => String(m.user_id)).filter(Boolean)));
+  const name = offices[0].name;
+  const propertyRows = await db(`properties?select=id,panorama_path,video_path&organization_id=eq.${encodeURIComponent(id)}`);
+  const propertyIds = propertyRows.map((p: any) => p.id);
+  const [photos, scenes, jobs] = await Promise.all([
+    db(`property_photos?select=storage_path&organization_id=eq.${encodeURIComponent(id)}`),
+    propertyIds.length ? db(`property_tour_scenes?select=panorama_path&property_id=in.(${propertyIds.join(",")})`) : Promise.resolve([]),
+    db(`video_processing_jobs?select=input_video_path,spatial_asset_path,stereo_video_path&organization_id=eq.${encodeURIComponent(id)}`),
+  ]);
+  const mediaPaths = new Set<string>();
+  for (const value of [
+    ...photos.map((x: any) => x.storage_path),
+    ...scenes.map((x: any) => x.panorama_path),
+    ...propertyRows.flatMap((x: any) => [x.panorama_path, x.video_path]),
+    ...jobs.flatMap((x: any) => [x.input_video_path, x.spatial_asset_path, x.stereo_video_path]),
+  ]) {
+    if (typeof value === "string" && value.trim() && !value.startsWith("http")) mediaPaths.add(value);
+  }
+  if (mediaPaths.size) {
+    const storage = await fetch(`${SUPABASE_URL}/storage/v1/object/property-media`, {
+      method: "DELETE", headers: DB_HEADERS, body: JSON.stringify({ prefixes: Array.from(mediaPaths) }),
+    });
+    if (!storage.ok) throw new Error("پاک‌سازی تصاویر و رسانه‌های دفتر ناموفق بود؛ حذف دفتر انجام نشد.");
+  }
+  // Organization-owned records cascade from organizations; media is removed first.
+  await db(`organizations?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+  const failed: string[] = [];
+  for (const userId of users) {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+      method: "DELETE", headers: DB_HEADERS,
+    });
+    if (!response.ok) failed.push(userId);
+  }
+  if (failed.length) {
+    console.error("Deleted office but some member auth accounts could not be deleted", { officeId: id, failed });
+    return send(chatId, `⚠️ دفتر «${name}» و اطلاعات وابسته‌اش حذف شد، اما حذف ${failed.length} حساب کاربری با خطا مواجه شد. شناسه دفتر: ${id}`);
+  }
+  return send(chatId, `🗑 دفتر «${name}» به‌طور کامل از NAMA حذف شد.\n\nتعداد حساب‌های وابسته حذف‌شده: ${users.length}\nفایل‌ها، گزارش‌ها، یادآوری‌ها و عضویت‌های متعلق به این دفتر نیز حذف شدند.\n\nاین عملیات قابل بازگشت نیست.`);
 }
 async function resetOfficeManager(chatId: number, orgId: string) {
   const offices = await db(`organizations?select=id,name&id=eq.${encodeURIComponent(orgId)}&limit=1`);
@@ -218,7 +262,7 @@ async function handle(chatId: number, rawText: string) {
   }
   if (command === "/help") {
     return send(chatId,
-      "📚 راهنمای پنل مرکزی NAMA\n\n/neworg نام_دفتر نام_کاربری_مدیر نام_کامل_مدیر\n/orgs نمایش دفاتر\n/renew شناسه_دفتر تعداد_روز\n/suspendorg شناسه_دفتر\n/activateorg شناسه_دفتر\n/resetmanager شناسه_دفتر\n\nافزودن، غیرفعال‌سازی و مدیریت مشاوران فقط از داخل اپلیکیشن و توسط مدیر همان دفتر انجام می‌شود.\nدستور قدیمی /adduser دیگر برای ساخت حساب استفاده نمی‌شود.");
+      "📚 راهنمای پنل مرکزی NAMA\n\n/neworg نام_دفتر نام_کاربری_مدیر نام_کامل_مدیر\n/orgs نمایش دفاتر\n/renew شناسه_دفتر تعداد_روز\n/suspendorg شناسه_دفتر\n/activateorg شناسه_دفتر\n/resetmanager شناسه_دفتر\n/deleteorg شناسه_دفتر (حذف دائمی با تأیید)\n\nافزودن، غیرفعال‌سازی و مدیریت مشاوران فقط از داخل اپلیکیشن و توسط مدیر همان دفتر انجام می‌شود.\nدستور قدیمی /adduser دیگر برای ساخت حساب استفاده نمی‌شود.");
   }
   if (command === "/neworg" && args.length === 0) {
     return telegram("sendMessage", {
@@ -304,6 +348,16 @@ async function handle(chatId: number, rawText: string) {
     buttons.push([{ text: "⬅️ منوی اصلی", callback_data: "/menu" }]);
     return send(chatId, "دفتر موردنظر برای بازیابی رمز مدیر را انتخاب کن:", { inline_keyboard: buttons });
   }
+  if (command.startsWith("/confirmdelete:")) {
+    const id = command.slice(15);
+    const offices = await db(`organizations?select=id,name&id=eq.${encodeURIComponent(id)}&limit=1`);
+    if (!offices.length) throw new Error("دفتر پیدا نشد.");
+    return send(chatId, `⚠️ حذف دائمی دفتر «${offices[0].name}»\n\nتمام فایل‌های ملک، مشاوران، حساب مدیر، گزارش‌ها، یادآوری‌ها و سوابق وابسته حذف خواهند شد. این عملیات قابل بازگشت نیست.\n\nآیا مطمئنی؟`, { inline_keyboard: [
+      [{ text: "🗑 بله، حذف کامل دفتر", callback_data: "/deleteorg:" + id }],
+      [{ text: "انصراف", callback_data: "/office:" + id }],
+    ] });
+  }
+  if (command.startsWith("/deleteorg:")) return deleteOffice(chatId, command.slice(11));
   if (command.startsWith("/resetoffice:")) return resetOfficeManager(chatId, command.slice(13));
   if (command === "/resetmanager") {
     if (!args[0]) throw new Error("شناسه دفتر را وارد کن.");
